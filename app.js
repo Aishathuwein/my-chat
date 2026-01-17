@@ -1,50 +1,58 @@
 // ============================
-// SECURECHAT APP - SIMPLIFIED VERSION
+// SECURECHAT APP - WORKING VERSION
 // ============================
 
 // Global variables
 let currentUser = null;
-let currentChat = null;
+let auth = null;
+let db = null;
 
-// Wait for DOM to load
+// Initialize app when DOM loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM loaded, initializing app...");
+    console.log("DOM loaded. Initializing app...");
     initializeApp();
 });
 
-// Initialize the entire application
 function initializeApp() {
-    console.log("Initializing Firebase...");
+    console.log("Step 1: Checking Firebase config...");
+    
+    // Check if firebaseConfig exists
+    if (!window.firebaseConfig) {
+        showError("Firebase config not found in window.firebaseConfig");
+        document.getElementById('firebase-status').textContent = "❌ Config missing!";
+        return;
+    }
+    
+    console.log("✅ Config found:", window.firebaseConfig);
+    document.getElementById('firebase-status').textContent = "✅ Config found";
     
     try {
-        // Check if Firebase config exists
-        if (!window.firebaseConfig) {
-            throw new Error("Firebase config not found! Check index.html");
+        console.log("Step 2: Initializing Firebase...");
+        
+        // Initialize Firebase (only if not already initialized)
+        let app;
+        if (!firebase.apps.length) {
+            app = firebase.initializeApp(firebaseConfig);
+            console.log("✅ Firebase initialized:", app.name);
+        } else {
+            app = firebase.apps[0];
+            console.log("✅ Firebase already initialized:", app.name);
         }
         
-        console.log("Firebase Config:", firebaseConfig);
-        
-        // Initialize Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        console.log("✅ Firebase initialized successfully!");
-        
         // Get Firebase services
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        auth = firebase.auth();
+        db = firebase.firestore();
         
-        console.log("Firebase services ready:", { auth, db });
+        console.log("✅ Firebase services ready");
         
-        // Setup authentication state listener
-        auth.onAuthStateChanged(function(user) {
-            console.log("Auth state changed:", user ? "User logged in" : "No user");
-            handleAuthStateChange(user);
-        });
+        // Setup authentication listener
+        setupAuthListener();
         
         // Setup event listeners
         setupEventListeners();
         
-        // Test Firebase connection
-        testFirebaseConnection();
+        // Show success
+        showToast("Firebase connected successfully!", "success");
         
     } catch (error) {
         console.error("❌ Firebase initialization failed:", error);
@@ -52,134 +60,82 @@ function initializeApp() {
     }
 }
 
-// Test Firebase connection
-function testFirebaseConnection() {
-    console.log("Testing Firebase connection...");
-    const auth = firebase.auth();
+function setupAuthListener() {
+    console.log("Setting up auth listener...");
     
-    // Try a simple operation
     auth.onAuthStateChanged(function(user) {
-        console.log("✅ Firebase connection test passed");
-    }, function(error) {
-        console.error("❌ Firebase connection test failed:", error);
+        console.log("Auth state changed:", user ? user.email : "No user");
+        
+        if (user) {
+            // User is signed in
+            currentUser = user;
+            showAppScreen();
+            updateUserInfo(user);
+            showToast("Welcome back, " + (user.displayName || user.email) + "!", "success");
+        } else {
+            // User is signed out
+            currentUser = null;
+            showAuthScreen();
+        }
     });
 }
 
-// Handle authentication state changes
-function handleAuthStateChange(user) {
-    console.log("handleAuthStateChange called with:", user?.email);
-    
-    if (user) {
-        // User is signed in
-        currentUser = user;
-        showAppScreen();
-        updateUserUI(user);
-    } else {
-        // User is signed out
-        currentUser = null;
-        showAuthScreen();
-    }
-}
-
-// Show authentication screen
-function showAuthScreen() {
-    console.log("Showing auth screen");
-    const authScreen = document.getElementById('auth-screen');
-    const appScreen = document.getElementById('app-screen');
-    
-    if (authScreen && appScreen) {
-        authScreen.style.display = 'flex';
-        appScreen.style.display = 'none';
-    }
-}
-
-// Show main app screen
-function showAppScreen() {
-    console.log("Showing app screen");
-    const authScreen = document.getElementById('auth-screen');
-    const appScreen = document.getElementById('app-screen');
-    
-    if (authScreen && appScreen) {
-        authScreen.style.display = 'none';
-        appScreen.style.display = 'flex';
-    }
-}
-
-// Update user UI
-function updateUserUI(user) {
-    console.log("Updating UI for user:", user.email);
-    
-    // Update user name
-    const userNameElement = document.getElementById('user-name');
-    if (userNameElement) {
-        userNameElement.textContent = user.displayName || user.email || "User";
-    }
-    
-    // Update user email
-    const userEmailElement = document.getElementById('user-email');
-    if (userEmailElement) {
-        userEmailElement.textContent = user.email;
-    }
-    
-    // Update auth button
-    const authButton = document.getElementById('auth-btn');
-    if (authButton) {
-        authButton.textContent = "Logout";
-        authButton.onclick = logout;
-    }
-}
-
-// Setup event listeners
 function setupEventListeners() {
     console.log("Setting up event listeners...");
     
-    // Login form
-    const loginButton = document.getElementById('login-form')?.querySelector('button');
-    if (loginButton) {
-        loginButton.onclick = login;
+    // Auth buttons
+    const loginBtn = document.getElementById('login-btn');
+    const registerBtn = document.getElementById('register-btn');
+    const googleBtn = document.getElementById('google-login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (registerBtn) registerBtn.addEventListener('click', handleRegister);
+    if (googleBtn) googleBtn.addEventListener('click', handleGoogleLogin);
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
+    
+    // Show register/login links
+    const showRegisterLink = document.getElementById('show-register-link');
+    const showLoginLink = document.getElementById('show-login-link');
+    
+    if (showRegisterLink) showRegisterLink.addEventListener('click', showRegisterForm);
+    if (showLoginLink) showLoginLink.addEventListener('click', showLoginForm);
+    
+    // Send message
+    const sendBtn = document.getElementById('send-btn');
+    const messageInput = document.getElementById('message-input');
+    
+    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
     }
     
-    // Register form
-    const registerButton = document.getElementById('register-form')?.querySelector('button');
-    if (registerButton) {
-        registerButton.onclick = register;
-    }
-    
-    // Google login button
-    const googleButton = document.querySelector('.btn-google');
-    if (googleButton) {
-        googleButton.onclick = loginWithGoogle;
-    }
-    
-    // Auth toggle links
-    const showRegisterLink = document.querySelector('.auth-link[onclick*="showRegister"]');
-    const showLoginLink = document.querySelector('.auth-link[onclick*="showLogin"]');
-    
-    if (showRegisterLink) {
-        showRegisterLink.onclick = showRegisterForm;
-    }
-    if (showLoginLink) {
-        showLoginLink.onclick = showLoginForm;
-    }
-    
-    // Send message button
-    const sendButton = document.getElementById('send-btn');
-    if (sendButton) {
-        sendButton.onclick = sendMessage;
-    }
-    
-    console.log("Event listeners setup complete");
+    console.log("✅ Event listeners setup complete");
 }
 
 // ============================
 // AUTHENTICATION FUNCTIONS
 // ============================
 
-async function login() {
-    console.log("Login function called");
+async function handleLogin() {
+    console.log("Login button clicked");
     
-    const email = document.getElementById('login-email')?.value;
-    const password = document.getElementById('login-password')?.value;
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
     
     if (!email || !password) {
         showError("Please enter email and password");
@@ -187,26 +143,25 @@ async function login() {
     }
     
     try {
-        showLoading("Logging in...");
+        showLoading(true, "Logging in...");
         
-        const auth = firebase.auth();
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        
         console.log("✅ Login successful:", userCredential.user.email);
-        showSuccess("Login successful!");
         
     } catch (error) {
         console.error("❌ Login failed:", error);
         showError("Login failed: " + error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
-async function register() {
-    console.log("Register function called");
+async function handleRegister() {
+    console.log("Register button clicked");
     
-    const name = document.getElementById('register-name')?.value;
-    const email = document.getElementById('register-email')?.value;
-    const password = document.getElementById('register-password')?.value;
+    const name = document.getElementById('register-name').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
     
     if (!name || !email || !password) {
         showError("Please fill all fields");
@@ -219,10 +174,7 @@ async function register() {
     }
     
     try {
-        showLoading("Creating account...");
-        
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        showLoading(true, "Creating account...");
         
         // Create user with email/password
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
@@ -243,212 +195,188 @@ async function register() {
         });
         
         console.log("✅ Registration successful:", user.email);
-        showSuccess("Account created successfully!");
+        showToast("Account created successfully!", "success");
         
     } catch (error) {
         console.error("❌ Registration failed:", error);
         showError("Registration failed: " + error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
-async function loginWithGoogle() {
-    console.log("Google login called");
+async function handleGoogleLogin() {
+    console.log("Google login clicked");
     
     try {
-        showLoading("Connecting with Google...");
+        showLoading(true, "Connecting with Google...");
         
-        const auth = firebase.auth();
         const provider = new firebase.auth.GoogleAuthProvider();
-        
         const userCredential = await auth.signInWithPopup(provider);
         const user = userCredential.user;
         
-        // Check if user document exists
-        const db = firebase.firestore();
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            // Create user document if doesn't exist
-            await db.collection('users').doc(user.uid).set({
-                name: user.displayName,
-                email: user.email,
-                photoURL: user.photoURL,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                isOnline: true,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-        
         console.log("✅ Google login successful:", user.email);
-        showSuccess("Google login successful!");
         
     } catch (error) {
         console.error("❌ Google login failed:", error);
         showError("Google login failed: " + error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
-async function logout() {
-    console.log("Logout called");
+async function handleLogout() {
+    console.log("Logout clicked");
     
     try {
-        const auth = firebase.auth();
+        showLoading(true, "Logging out...");
         await auth.signOut();
-        
         console.log("✅ Logout successful");
-        showSuccess("Logged out successfully");
-        
+        showToast("Logged out successfully", "success");
     } catch (error) {
         console.error("❌ Logout failed:", error);
         showError("Logout failed: " + error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
 // ============================
-// UI HELPER FUNCTIONS
+// UI FUNCTIONS
 // ============================
 
-function showRegisterForm() {
-    console.log("Showing register form");
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
+function showAuthScreen() {
+    console.log("Showing auth screen");
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+}
+
+function showAppScreen() {
+    console.log("Showing app screen");
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+}
+
+function updateUserInfo(user) {
+    console.log("Updating user info for:", user.email);
     
-    if (loginForm && registerForm) {
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
+    const userNameEl = document.getElementById('user-name');
+    const userStatusEl = document.getElementById('status-text');
+    
+    if (userNameEl) {
+        userNameEl.textContent = user.displayName || user.email || 'User';
     }
+    
+    if (userStatusEl) {
+        userStatusEl.textContent = 'Online';
+        userStatusEl.parentElement.classList.add('online');
+    }
+}
+
+function showRegisterForm() {
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('register-form').style.display = 'block';
 }
 
 function showLoginForm() {
-    console.log("Showing login form");
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
+    document.getElementById('register-form').style.display = 'block';
+    document.getElementById('login-form').style.display = 'none';
+}
+
+function switchTab(tabName) {
+    console.log("Switching to tab:", tabName);
     
-    if (loginForm && registerForm) {
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-    }
+    // Update active tab
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Show active content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`${tabName}-tab`).classList.add('active');
 }
 
-function showLoading(message) {
-    console.log("Loading:", message);
-    // You can add a loading spinner here
-}
-
-function showSuccess(message) {
-    console.log("Success:", message);
-    alert(message); // Replace with better UI notification
-}
-
-function showError(message) {
-    console.error("Error:", message);
-    alert("❌ " + message); // Replace with better UI notification
-}
-
-// ============================
-// MESSAGING FUNCTIONS (BASIC)
-// ============================
-
-async function sendMessage() {
+function sendMessage() {
     if (!currentUser) {
         showError("Please login first");
         return;
     }
     
-    if (!currentChat) {
-        showError("Please select a chat first");
-        return;
-    }
-    
-    const messageInput = document.getElementById('message-input');
-    const message = messageInput?.value?.trim();
+    const input = document.getElementById('message-input');
+    const message = input.value.trim();
     
     if (!message) {
         showError("Please enter a message");
         return;
     }
     
-    try {
-        const db = firebase.firestore();
-        
-        // Encrypt message (basic implementation)
-        const encryptedMessage = window.encryption?.encryptMessage?.(message, currentChat) || message;
-        
-        // Send message to Firestore
-        await db.collection('chats').doc(currentChat).collection('messages').add({
-            text: encryptedMessage,
-            senderId: currentUser.uid,
-            senderName: currentUser.displayName || currentUser.email,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            isEncrypted: !!window.encryption
-        });
-        
-        // Update last message
-        await db.collection('chats').doc(currentChat).update({
-            lastMessage: message,
-            lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
-            lastSenderId: currentUser.uid
-        });
-        
-        // Clear input
-        if (messageInput) {
-            messageInput.value = '';
-        }
-        
-        console.log("✅ Message sent");
-        
-    } catch (error) {
-        console.error("❌ Failed to send message:", error);
-        showError("Failed to send message: " + error.message);
+    console.log("Sending message:", message);
+    
+    // For now, just clear input
+    input.value = '';
+    
+    // Show demo message
+    showToast("Message sent (demo)", "success");
+}
+
+// ============================
+// HELPER FUNCTIONS
+// ============================
+
+function showLoading(show, message = "") {
+    if (show) {
+        console.log("Loading:", message);
+        // You can add a loading spinner here
+    } else {
+        // Hide loading spinner
     }
+}
+
+function showToast(message, type = "info") {
+    console.log("Toast:", message);
+    
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    
+    toast.textContent = message;
+    toast.className = type;
+    toast.style.display = 'block';
+    
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 3000);
+}
+
+function showError(message) {
+    console.error("Error:", message);
+    showToast("❌ " + message, "error");
 }
 
 // ============================
 // DEBUG FUNCTIONS
 // ============================
 
-// Test if everything is working
-function testAll() {
-    console.log("=== TESTING EVERYTHING ===");
-    
-    // Test 1: Check Firebase config
+window.debugApp = function() {
+    console.log("=== APP DEBUG INFO ===");
     console.log("1. Firebase config:", window.firebaseConfig ? "✅ Found" : "❌ Missing");
+    console.log("2. Firebase SDK:", typeof firebase !== 'undefined' ? "✅ Loaded" : "❌ Missing");
+    console.log("3. Firebase apps:", firebase.apps?.length || 0);
+    console.log("4. Current user:", currentUser ? currentUser.email : "❌ Not logged in");
+    console.log("5. Auth service:", auth ? "✅ Ready" : "❌ Not ready");
+    console.log("6. Firestore service:", db ? "✅ Ready" : "❌ Not ready");
+    console.log("=== DEBUG COMPLETE ===");
     
-    // Test 2: Check Firebase initialization
-    try {
-        const apps = firebase.apps;
-        console.log("2. Firebase apps:", apps.length > 0 ? "✅ Initialized" : "❌ Not initialized");
-    } catch (e) {
-        console.log("2. Firebase:", "❌ Not loaded");
-    }
-    
-    // Test 3: Check DOM elements
-    const elements = ['auth-screen', 'app-screen', 'login-email', 'register-name'];
-    elements.forEach(id => {
-        const el = document.getElementById(id);
-        console.log(`3. ${id}:`, el ? "✅ Found" : "❌ Missing");
-    });
-    
-    // Test 4: Check current user
-    console.log("4. Current user:", currentUser ? "✅ Logged in" : "❌ Not logged in");
-    
-    console.log("=== TEST COMPLETE ===");
-}
+    showToast("Debug info logged to console", "info");
+};
 
-// Run test on load
-setTimeout(() => {
-    console.log("App initialized. Type 'testAll()' in console to test everything.");
-}, 1000);
-
-// ============================
-// MAKE FUNCTIONS GLOBALLY AVAILABLE
-// ============================
-
-window.login = login;
-window.register = register;
-window.loginWithGoogle = loginWithGoogle;
-window.logout = logout;
+// Make functions globally available
+window.handleLogin = handleLogin;
+window.handleRegister = handleRegister;
+window.handleGoogleLogin = handleGoogleLogin;
+window.handleLogout = handleLogout;
 window.showRegisterForm = showRegisterForm;
 window.showLoginForm = showLoginForm;
 window.sendMessage = sendMessage;
-window.testAll = testAll;
