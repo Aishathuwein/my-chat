@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat 🔐</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Crypto Library for Encryption -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen">
+        <div class="auth-container">
+            <div class="logo">
+                <i class="fas fa-lock"></i>
+                <h1>SecureChat</h1>
+                <p>End-to-end encrypted messaging</p>
+            </div>
+            
+            <div class="auth-options">
+                <div class="auth-form" id="login-form">
+                    <h2>Login</h2>
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button onclick="login()" class="btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    <p class="auth-link" onclick="showRegister()">
+                        Don't have account? Register
+                    </p>
+                </div>
+                
+                <div class="auth-form" id="register-form" style="display: none;">
+                    <h2>Register</h2>
+                    <input type="text" id="register-name" placeholder="Full Name" required>
+                    <input type="email" id="register-email" placeholder="Email" required>
+                    <input type="password" id="register-password" placeholder="Password (min 6 chars)" required>
+                    <button onclick="register()" class="btn-primary">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </button>
+                    <p class="auth-link" onclick="showLogin()">
+                        Already have account? Login
+                    </p>
+                </div>
+                
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+                
+                <button onclick="loginWithGoogle()" class="btn-google">
+                    <i class="fab fa-google"></i> Continue with Google
+                </button>
+            </div>
+            
+            <div class="security-info">
+                <p><i class="fas fa-shield-alt"></i> All messages are end-to-end encrypted</p>
+                <p><i class="fas fa-lock"></i> Even we cannot read your messages</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="app-screen" class="screen" style="display: none;">
+        <div class="app-container">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- User Profile -->
+                <div class="user-profile">
+                    <div class="avatar" id="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <h3 id="user-name">Loading...</h3>
+                        <p class="status online" id="user-status">
+                            <span class="status-dot"></span> Online
+                        </p>
+                    </div>
+                    <button class="btn-icon" onclick="showSettings()" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+
+                <!-- Search -->
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-contacts" placeholder="Search contacts...">
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('chats')">
+                        <i class="fas fa-comments"></i> Chats
+                    </button>
+                    <button class="tab" onclick="showTab('contacts')">
+                        <i class="fas fa-users"></i> Contacts
+                    </button>
+                    <button class="tab" onclick="showTab('groups')">
+                        <i class="fas fa-user-group"></i> Groups
+                    </button>
+                </div>
+
+                <!-- Chats List -->
+                <div class="chats-list" id="chats-tab">
+                    <!-- Chats will be loaded here -->
+                    <div class="loading">Loading chats...</div>
+                </div>
+
+                <!-- Contacts List -->
+                <div class="chats-list" id="contacts-tab" style="display: none;">
+                    <!-- Contacts will be loaded here -->
+                </div>
+
+                <!-- Groups List -->
+                <div class="chats-list" id="groups-tab" style="display: none;">
+                    <button class="btn-create-group" onclick="showCreateGroupModal()">
+                        <i class="fas fa-plus"></i> Create New Group
+                    </button>
+                    <!-- Groups will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <!-- No Chat Selected -->
+                <div class="no-chat-selected" id="no-chat">
+                    <div class="welcome-message">
+                        <i class="fas fa-comment-slash"></i>
+                        <h2>Select a chat to start messaging</h2>
+                        <p>Your messages are encrypted end-to-end</p>
+                    </div>
+                </div>
+
+                <!-- Active Chat -->
+                <div class="active-chat" id="active-chat" style="display: none;">
+                    <!-- Chat Header -->
+                    <div class="chat-header">
+                        <div class="chat-info">
+                            <div class="avatar">
+                                <i class="fas" id="chat-avatar-icon"></i>
+                            </div>
+                            <div>
+                                <h3 id="chat-title">Loading...</h3>
+                                <p id="chat-subtitle">...</p>
+                            </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button class="btn-icon" onclick="showChatInfo()" title="Chat Info">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                            <button class="btn-icon" onclick="showEncryptionInfo()" title="Encryption Info">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                            <button class="btn-icon" onclick="clearChat()" title="Clear Chat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Messages Container -->
+                    <div class="messages-container" id="messages-container">
+                        <!-- Messages will appear here -->
+                        <div class="message-day">
+                            <span>Today</span>
+                        </div>
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="message-input-area">
+                        <button class="btn-icon" onclick="toggleAttachment()" title="Attach File">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        
+                        <div class="attachment-menu" id="attachment-menu" style="display: none;">
+                            <button onclick="attachFile('image')">
+                                <i class="fas fa-image"></i> Photo
+                            </button>
+                            <button onclick="attachFile('document')">
+                                <i class="fas fa-file"></i> Document
+                            </button>
+                            <button onclick="attachFile('audio')">
+                                <i class="fas fa-microphone"></i> Voice Message
+                            </button>
+                        </div>
+
+                        <div class="input-wrapper">
+                            <textarea 
+                                id="message-input" 
+                                placeholder="Type your encrypted message..." 
+                                rows="1"
+                                onkeydown="handleKeyDown(event)"
+                            ></textarea>
+                            <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+
+                        <button class="btn-send" onclick="sendMessage()" id="send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+
+                    <!-- File Preview -->
+                    <div class="file-preview" id="file-preview" style="display: none;">
+                        <div class="file-info">
+                            <i class="fas fa-file"></i>
+                            <span id="file-name">file.jpg</span>
+                            <button onclick="clearAttachment()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel (Empty for now) -->
+            <div class="right-panel">
+                <div class="panel-content" id="panel-content">
+                    <!-- Will show chat info, settings, or group info -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="create-group-modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Create New Group</h2>
+            <input type="text" id="group-name" placeholder="Group Name" required>
+            <textarea id="group-description" placeholder="Group Description (optional)"></textarea>
+            
+            <div class="members-selection">
+                <h3>Add Members</h3>
+                <div id="available-contacts">
+                    <!-- Contacts will be loaded here -->
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal('create-group-modal')">
+                    Cancel
+                </button>
+                <button class="btn-primary" onclick="createGroup()">
+                    Create Group
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="settings-section">
+                <h3>Encryption</h3>
+                <div class="setting-item">
+                    <span>End-to-End Encryption</span>
+                    <div class="toggle active">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+                <p class="setting-description">
+                    <i class="fas fa-lock"></i> All messages are encrypted with AES-256
+                </p>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Privacy</h3>
+                <button class="setting-btn" onclick="exportEncryptionKeys()">
+                    <i class="fas fa-key"></i> Export Encryption Keys
+                </button>
+                <button class="setting-btn" onclick="deleteAllMessages()">
+                    <i class="fas fa-trash"></i> Delete All Messages
+                </button>
+            </div>
+            
+            <button class="btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- Overlay for modals -->
+    <div class="modal-overlay" id="modal-overlay" style="display: none;"></div>
+
+    <!-- Firebase Config -->
+    <script>
+        // PASTE YOUR FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+    </script>
+
+    <!-- App Scripts -->
+    <script src="encryption.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
