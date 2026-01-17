@@ -81,8 +81,8 @@
                     </div>
                     <div class="user-info">
                         <h3 id="user-name">Loading...</h3>
-                        <p class="status online" id="user-status">
-                            <span class="status-dot"></span> Online
+                        <p class="status" id="user-status">
+                            <span class="status-dot"></span> Offline
                         </p>
                     </div>
                     <button class="btn-icon" onclick="showSettings()" title="Settings">
@@ -111,13 +111,12 @@
 
                 <!-- Chats List -->
                 <div class="chats-list" id="chats-tab">
-                    <!-- Chats will be loaded here -->
-                    <div class="loading">Loading chats...</div>
+                    <div class="loading" id="chats-loading">Loading chats...</div>
                 </div>
 
                 <!-- Contacts List -->
                 <div class="chats-list" id="contacts-tab" style="display: none;">
-                    <!-- Contacts will be loaded here -->
+                    <div class="loading" id="contacts-loading">Loading contacts...</div>
                 </div>
 
                 <!-- Groups List -->
@@ -125,7 +124,7 @@
                     <button class="btn-create-group" onclick="showCreateGroupModal()">
                         <i class="fas fa-plus"></i> Create New Group
                     </button>
-                    <!-- Groups will be loaded here -->
+                    <div class="loading" id="groups-loading">Loading groups...</div>
                 </div>
             </div>
 
@@ -145,8 +144,8 @@
                     <!-- Chat Header -->
                     <div class="chat-header">
                         <div class="chat-info">
-                            <div class="avatar">
-                                <i class="fas" id="chat-avatar-icon"></i>
+                            <div class="avatar" id="chat-avatar">
+                                <i class="fas fa-user" id="chat-avatar-icon"></i>
                             </div>
                             <div>
                                 <h3 id="chat-title">Loading...</h3>
@@ -169,9 +168,6 @@
                     <!-- Messages Container -->
                     <div class="messages-container" id="messages-container">
                         <!-- Messages will appear here -->
-                        <div class="message-day">
-                            <span>Today</span>
-                        </div>
                     </div>
 
                     <!-- Message Input -->
@@ -197,7 +193,6 @@
                                 id="message-input" 
                                 placeholder="Type your encrypted message..." 
                                 rows="1"
-                                onkeydown="handleKeyDown(event)"
                             ></textarea>
                             <div class="typing-indicator" id="typing-indicator" style="display: none;">
                                 <span></span><span></span><span></span>
@@ -212,7 +207,7 @@
                     <!-- File Preview -->
                     <div class="file-preview" id="file-preview" style="display: none;">
                         <div class="file-info">
-                            <i class="fas fa-file"></i>
+                            <i class="fas fa-file" id="file-icon"></i>
                             <span id="file-name">file.jpg</span>
                             <button onclick="clearAttachment()">
                                 <i class="fas fa-times"></i>
@@ -222,16 +217,22 @@
                 </div>
             </div>
 
-            <!-- Right Panel (Empty for now) -->
+            <!-- Right Panel -->
             <div class="right-panel">
                 <div class="panel-content" id="panel-content">
-                    <!-- Will show chat info, settings, or group info -->
+                    <div class="panel-welcome">
+                        <i class="fas fa-lock"></i>
+                        <h3>Secure Chat</h3>
+                        <p>End-to-end encrypted messaging system</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modals -->
+    <div class="modal-overlay" id="modal-overlay" style="display: none;"></div>
+    
     <div class="modal" id="create-group-modal" style="display: none;">
         <div class="modal-content">
             <h2>Create New Group</h2>
@@ -241,7 +242,7 @@
             <div class="members-selection">
                 <h3>Add Members</h3>
                 <div id="available-contacts">
-                    <!-- Contacts will be loaded here -->
+                    <div class="loading">Loading contacts...</div>
                 </div>
             </div>
             
@@ -264,7 +265,7 @@
                 <h3>Encryption</h3>
                 <div class="setting-item">
                     <span>End-to-End Encryption</span>
-                    <div class="toggle active">
+                    <div class="toggle active" id="encryption-toggle">
                         <div class="toggle-slider"></div>
                     </div>
                 </div>
@@ -278,8 +279,8 @@
                 <button class="setting-btn" onclick="exportEncryptionKeys()">
                     <i class="fas fa-key"></i> Export Encryption Keys
                 </button>
-                <button class="setting-btn" onclick="deleteAllMessages()">
-                    <i class="fas fa-trash"></i> Delete All Messages
+                <button class="setting-btn" onclick="clearAllChats()">
+                    <i class="fas fa-trash"></i> Clear All Chats
                 </button>
             </div>
             
@@ -289,22 +290,48 @@
         </div>
     </div>
 
-    <!-- Overlay for modals -->
-    <div class="modal-overlay" id="modal-overlay" style="display: none;"></div>
+    <!-- Encryption Info Modal -->
+    <div class="modal" id="encryption-info-modal" style="display: none;">
+        <div class="modal-content">
+            <h2><i class="fas fa-lock"></i> Encryption Info</h2>
+            <div class="encryption-details">
+                <div class="encryption-item">
+                    <span>Algorithm:</span>
+                    <strong>AES-256</strong>
+                </div>
+                <div class="encryption-item">
+                    <span>Key Exchange:</span>
+                    <strong>End-to-End</strong>
+                </div>
+                <div class="encryption-item">
+                    <span>Security:</span>
+                    <strong>Military Grade</strong>
+                </div>
+                <div class="encryption-item">
+                    <span>Fingerprint:</span>
+                    <code id="encryption-fingerprint">XXXX-XXXX-XXXX</code>
+                </div>
+            </div>
+            <p class="encryption-note">
+                <i class="fas fa-info-circle"></i> Only you and the recipient can read messages.
+                Not even we can decrypt them.
+            </p>
+            <button class="btn-secondary" onclick="closeModal('encryption-info-modal')">
+                Close
+            </button>
+        </div>
+    </div>
 
     <!-- Firebase Config -->
     <script>
-        // PASTE YOUR FIREBASE CONFIG HERE
+        // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG ⚠️
         const firebaseConfig = {
-            
-  apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
-  authDomain: "my-chat-app-e1a85.firebaseapp.com",
-  databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
-  projectId: "my-chat-app-e1a85",
-  storageBucket: "my-chat-app-e1a85.firebasestorage.app",
-  messagingSenderId: "1018726193704",
-  appId: "1:1018726193704:web:58ff7905d107248e86331d"
-
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
     </script>
 

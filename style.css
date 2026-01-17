@@ -209,6 +209,12 @@ body {
     font-size: 20px;
 }
 
+.avatar.small {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+}
+
 .user-info {
     flex: 1;
 }
@@ -230,7 +236,7 @@ body {
 .status-dot {
     width: 8px;
     height: 8px;
-    background: #10b981;
+    background: #64748b;
     border-radius: 50%;
 }
 
@@ -343,32 +349,18 @@ body {
     border-left: 3px solid #6366f1;
 }
 
-.chat-item.unread .chat-content h4 {
-    color: #f1f5f9;
-    font-weight: 600;
-}
-
-.chat-item.unread .chat-content p {
-    color: #f1f5f9;
-}
-
-.unread-badge {
-    background: #6366f1;
-    color: white;
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    margin-left: auto;
-}
-
 .chat-content {
     flex: 1;
+    min-width: 0;
 }
 
 .chat-content h4 {
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .chat-content p {
@@ -382,6 +374,16 @@ body {
 .chat-time {
     font-size: 12px;
     color: #64748b;
+    white-space: nowrap;
+}
+
+.unread-badge {
+    background: #6366f1;
+    color: white;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 5px;
 }
 
 .btn-create-group {
@@ -398,6 +400,11 @@ body {
     align-items: center;
     justify-content: center;
     gap: 8px;
+}
+
+.btn-create-group:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(99, 102, 241, 0.3);
 }
 
 /* Chat Area */
@@ -486,12 +493,12 @@ body {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 10px;
 }
 
 .message-day {
     text-align: center;
-    margin: 20px 0;
+    margin: 10px 0;
 }
 
 .message-day span {
@@ -504,7 +511,7 @@ body {
 
 .message {
     max-width: 70%;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     animation: messageAppear 0.3s ease-out;
 }
 
@@ -566,7 +573,7 @@ body {
 }
 
 .message-status .fa-check-double {
-    color: #6366f1;
+    color: #ffffff;
 }
 
 .message-input-area {
@@ -658,6 +665,7 @@ textarea:focus {
     gap: 5px;
     min-width: 150px;
     backdrop-filter: blur(10px);
+    z-index: 100;
 }
 
 .attachment-menu button {
@@ -700,6 +708,21 @@ textarea:focus {
 .file-info span {
     flex: 1;
     font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-info button {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.file-info button:hover {
+    color: #f1f5f9;
 }
 
 /* Right Panel */
@@ -712,6 +735,29 @@ textarea:focus {
 
 .panel-content {
     padding: 20px;
+}
+
+.panel-welcome {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.panel-welcome i {
+    font-size: 48px;
+    color: #6366f1;
+    margin-bottom: 20px;
+    opacity: 0.7;
+}
+
+.panel-welcome h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #f1f5f9;
+}
+
+.panel-welcome p {
+    color: #94a3b8;
+    font-size: 14px;
 }
 
 /* Modals */
@@ -746,6 +792,9 @@ textarea:focus {
 .modal h2 {
     margin-bottom: 20px;
     color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .modal input,
@@ -783,6 +832,7 @@ textarea:focus {
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.2s;
+    margin-bottom: 5px;
 }
 
 .contact-checkbox:hover {
@@ -792,6 +842,7 @@ textarea:focus {
 .contact-checkbox input {
     width: auto;
     margin: 0;
+    transform: scale(1.2);
 }
 
 .modal-actions {
@@ -818,6 +869,8 @@ textarea:focus {
 /* Settings */
 .settings-section {
     margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .settings-section h3 {
@@ -831,7 +884,6 @@ textarea:focus {
     align-items: center;
     justify-content: space-between;
     padding: 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .toggle {
@@ -911,6 +963,69 @@ textarea:focus {
     background: rgba(239, 68, 68, 0.3);
 }
 
+/* Encryption Info */
+.encryption-details {
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.encryption-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.encryption-item:last-child {
+    border-bottom: none;
+}
+
+.encryption-item span {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.encryption-item strong {
+    color: #f1f5f9;
+    font-weight: 600;
+}
+
+.encryption-item code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #10b981;
+}
+
+.encryption-note {
+    font-size: 14px;
+    color: #94a3b8;
+    padding: 15px;
+    background: rgba(30, 41, 59, 0.3);
+    border-radius: 10px;
+    margin: 20px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.encryption-note i {
+    color: #6366f1;
+    margin-top: 2px;
+}
+
+/* Loading */
+.loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
@@ -928,14 +1043,6 @@ textarea:focus {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
-}
-
-/* Loading */
-.loading {
-    text-align: center;
-    padding: 40px;
-    color: #94a3b8;
-    font-size: 14px;
 }
 
 /* Responsive */
@@ -958,5 +1065,6 @@ textarea:focus {
     .modal {
         min-width: 90vw;
         max-width: 95vw;
+        padding: 20px;
     }
 }
