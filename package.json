@@ -1,0 +1,11 @@
+{
+  "name": "secure-chat-app",
+  "version": "1.0.0",
+  "description": "Secure chat application with end-to-end encryption",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "echo 'No build required'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
