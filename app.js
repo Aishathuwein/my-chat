@@ -2,155 +2,329 @@
 // MAIN APPLICATION
 // ============================
 
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const storage = firebase.storage();
-const realtimeDb = firebase.database();
-
-// Global variables
+// Global variables (accessible everywhere)
 let currentUser = null;
 let currentChat = null;
 let contacts = [];
 let groups = [];
 let selectedContacts = [];
+let selectedFile = null;
+
+// DOM Elements (will be set when page loads)
+let authScreen, appScreen, userEmailElement, authButton;
+
+// Wait for DOM to load completely
+document.addEventListener('DOMContentLoaded', async function() {
+    
+    // Initialize DOM elements
+    initializeDOMElements();
+    
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    const realtimeDb = firebase.database();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Check auth state
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            await initializeUser(user);
+        }
+    });
+    
+    console.log("App initialized successfully!");
+});
 
 // ============================
-// AUTHENTICATION
+// INITIALIZE DOM ELEMENTS
 // ============================
+
+function initializeDOMElements() {
+    console.log("Initializing DOM elements...");
+    
+    // Get all required elements
+    authScreen = document.getElementById('auth-screen');
+    appScreen = document.getElementById('app-screen');
+    
+    // Auth elements
+    userEmailElement = document.getElementById('user-email');
+    authButton = document.getElementById('auth-btn');
+    
+    // Check if elements exist
+    if (!authScreen) console.error("❌ auth-screen element not found!");
+    if (!appScreen) console.error("❌ app-screen element not found!");
+    if (!userEmailElement) console.error("❌ user-email element not found!");
+    if (!authButton) console.error("❌ auth-btn element not found!");
+}
+
+// ============================
+// SETUP EVENT LISTENERS
+// ============================
+
+function setupEventListeners() {
+    console.log("Setting up event listeners...");
+    
+    // Auth button
+    if (authButton) {
+        authButton.addEventListener('click', toggleAuth);
+    } else {
+        console.error("❌ auth-btn not found for event listener");
+    }
+    
+    // Tab buttons
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+            showTab(tabName);
+        });
+    });
+    
+    // Message input
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.addEventListener('input', function() {
+            adjustTextareaHeight(this);
+        });
+        
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+    
+    // Send button
+    const sendBtn = document.getElementById('send-btn');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
+    
+    // Modals
+    const modalOverlay = document.getElementById('modal-overlay');
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeAllModals);
+    }
+    
+    console.log("Event listeners setup complete!");
+}
+
+// ============================
+// AUTHENTICATION FUNCTIONS
+// ============================
+
+async function toggleAuth() {
+    if (currentUser) {
+        // Logout
+        await logout();
+    } else {
+        // Login with Google
+        await loginWithGoogle();
+    }
+}
 
 async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+    const email = document.getElementById('login-email');
+    const password = document.getElementById('login-password');
+    
+    if (!email || !password) {
+        alert("Login form elements not found!");
+        return;
+    }
     
     try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email.value, password.value);
         await initializeUser(userCredential.user);
     } catch (error) {
         alert('Login failed: ' + error.message);
+        console.error("Login error:", error);
     }
 }
 
 async function register() {
-    const name = document.getElementById('register-name').value;
-    const email = document.getElementById('register-email').value;
-    const password = document.getElementById('register-password').value;
+    const name = document.getElementById('register-name');
+    const email = document.getElementById('register-email');
+    const password = document.getElementById('register-password');
     
-    if (password.length < 6) {
+    if (!name || !email || !password) {
+        alert("Register form elements not found!");
+        return;
+    }
+    
+    if (password.value.length < 6) {
         alert('Password must be at least 6 characters');
         return;
     }
     
     try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email.value, password.value);
         
         // Create user profile
-        await db.collection('users').doc(userCredential.user.uid).set({
-            name: name,
-            email: email,
+        await firebase.firestore().collection('users').doc(userCredential.user.uid).set({
+            name: name.value,
+            email: email.value,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+            isOnline: true
         });
         
         await initializeUser(userCredential.user);
     } catch (error) {
         alert('Registration failed: ' + error.message);
+        console.error("Registration error:", error);
     }
 }
 
 async function loginWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
-        const userCredential = await auth.signInWithPopup(provider);
+        const userCredential = await firebase.auth().signInWithPopup(provider);
         await initializeUser(userCredential.user);
     } catch (error) {
         alert('Google login failed: ' + error.message);
+        console.error("Google login error:", error);
     }
 }
 
 async function initializeUser(user) {
+    console.log("Initializing user:", user.email);
     currentUser = user;
     
-    // Generate encryption keys
-    await encryption.generateUserKeyPair();
-    
-    // Update online status
-    await updateOnlineStatus(true);
-    
-    // Load user data
-    await loadUserData();
-    
-    // Switch to app screen
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('app-screen').style.display = 'flex';
-    
-    // Load chats and contacts
-    await loadContacts();
-    await loadChats();
-    await loadGroups();
-    
-    // Set up realtime listeners
-    setupRealtimeListeners();
+    try {
+        // Generate encryption keys
+        await encryption.generateUserKeyPair();
+        
+        // Update online status
+        await updateOnlineStatus(true);
+        
+        // Load user data
+        await loadUserData();
+        
+        // Switch to app screen
+        if (authScreen && appScreen) {
+            authScreen.style.display = 'none';
+            appScreen.style.display = 'flex';
+        } else {
+            console.error("❌ Screen elements not found!");
+        }
+        
+        // Load chats and contacts
+        await loadContacts();
+        await loadChats();
+        await loadGroups();
+        
+        console.log("✅ User initialized successfully!");
+        
+    } catch (error) {
+        console.error("Error initializing user:", error);
+    }
 }
 
 async function updateOnlineStatus(isOnline) {
     if (!currentUser) return;
     
-    // Update Firestore
-    await db.collection('users').doc(currentUser.uid).update({
-        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-        isOnline: isOnline
-    });
-    
-    // Update Realtime Database for realtime status
-    await realtimeDb.ref('status/' + currentUser.uid).set({
-        isOnline: isOnline,
-        lastChanged: firebase.database.ServerValue.TIMESTAMP
-    });
+    try {
+        await firebase.firestore().collection('users').doc(currentUser.uid).update({
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+            isOnline: isOnline
+        });
+        
+        await firebase.database().ref('status/' + currentUser.uid).set({
+            isOnline: isOnline,
+            lastChanged: firebase.database.ServerValue.TIMESTAMP
+        });
+    } catch (error) {
+        console.error("Error updating online status:", error);
+    }
 }
 
 async function loadUserData() {
     if (!currentUser) return;
     
-    const userDoc = await db.collection('users').doc(currentUser.uid).get();
-    const userData = userDoc.data();
-    
-    document.getElementById('user-name').textContent = userData?.name || currentUser.email;
-    document.getElementById('user-email').textContent = currentUser.email;
-    
-    // Update avatar
-    const avatarIcon = document.getElementById('user-avatar').querySelector('i');
-    if (userData?.photoURL) {
-        avatarIcon.className = 'fas fa-user';
-        // In real app, you would set background image
+    try {
+        const userDoc = await firebase.firestore().collection('users').doc(currentUser.uid).get();
+        const userData = userDoc.data();
+        
+        // Update UI elements - check if they exist first
+        const userNameElement = document.getElementById('user-name');
+        const userEmailElement = document.getElementById('user-email');
+        const userStatusElement = document.getElementById('user-status');
+        
+        if (userNameElement) userNameElement.textContent = userData?.name || currentUser.email;
+        if (userEmailElement) userEmailElement.textContent = currentUser.email;
+        if (userStatusElement) {
+            userStatusElement.textContent = 'Online';
+            userStatusElement.className = 'status online';
+        }
+        
+        // Update auth button
+        if (authButton) {
+            authButton.textContent = 'Logout';
+            authButton.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
+        }
+        
+    } catch (error) {
+        console.error("Error loading user data:", error);
     }
 }
 
 function showRegister() {
-    document.getElementById('login-form').style.display = 'none';
-    document.getElementById('register-form').style.display = 'block';
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    
+    if (loginForm && registerForm) {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+    }
 }
 
 function showLogin() {
-    document.getElementById('register-form').style.display = 'block';
-    document.getElementById('login-form').style.display = 'none';
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    
+    if (loginForm && registerForm) {
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+    }
 }
 
 async function logout() {
-    await updateOnlineStatus(false);
-    await auth.signOut();
-    encryption.clearKeys();
-    
-    // Switch to auth screen
-    document.getElementById('app-screen').style.display = 'none';
-    document.getElementById('auth-screen').style.display = 'flex';
-    
-    // Clear all data
-    currentUser = null;
-    currentChat = null;
-    contacts = [];
-    groups = [];
+    try {
+        await updateOnlineStatus(false);
+        await firebase.auth().signOut();
+        encryption.clearKeys();
+        
+        // Switch to auth screen
+        if (authScreen && appScreen) {
+            appScreen.style.display = 'none';
+            authScreen.style.display = 'flex';
+        }
+        
+        // Reset UI
+        const authButton = document.getElementById('auth-btn');
+        if (authButton) {
+            authButton.textContent = 'Login';
+            authButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+        }
+        
+        // Clear all data
+        currentUser = null;
+        currentChat = null;
+        contacts = [];
+        groups = [];
+        selectedContacts = [];
+        
+        console.log("✅ User logged out successfully!");
+        
+    } catch (error) {
+        console.error("Logout error:", error);
+        alert('Logout failed: ' + error.message);
+    }
 }
 
 // ============================
@@ -161,7 +335,7 @@ async function loadContacts() {
     if (!currentUser) return;
     
     try {
-        const contactsSnapshot = await db.collection('users')
+        const contactsSnapshot = await firebase.firestore().collection('users')
             .where('email', '!=', currentUser.email)
             .limit(50)
             .get();
@@ -184,8 +358,7 @@ async function loadChats() {
     if (!currentUser) return;
     
     try {
-        // Load one-on-one chats
-        const chatsSnapshot = await db.collection('chats')
+        const chatsSnapshot = await firebase.firestore().collection('chats')
             .where('participants', 'array-contains', currentUser.uid)
             .where('isGroup', '==', false)
             .orderBy('lastMessageTime', 'desc')
@@ -193,16 +366,23 @@ async function loadChats() {
             .get();
         
         const chatsContainer = document.getElementById('chats-tab');
+        if (!chatsContainer) {
+            console.error("❌ chats-tab element not found!");
+            return;
+        }
+        
         chatsContainer.innerHTML = '';
+        
+        if (chatsSnapshot.empty) {
+            chatsContainer.innerHTML = '<div class="loading">No chats yet</div>';
+            return;
+        }
         
         chatsSnapshot.forEach(doc => {
             const chat = { id: doc.id, ...doc.data() };
             renderChatItem(chat, chatsContainer);
         });
         
-        if (chatsSnapshot.empty) {
-            chatsContainer.innerHTML = '<div class="loading">No chats yet</div>';
-        }
     } catch (error) {
         console.error('Error loading chats:', error);
     }
@@ -212,7 +392,7 @@ async function loadGroups() {
     if (!currentUser) return;
     
     try {
-        const groupsSnapshot = await db.collection('chats')
+        const groupsSnapshot = await firebase.firestore().collection('chats')
             .where('participants', 'array-contains', currentUser.uid)
             .where('isGroup', '==', true)
             .orderBy('lastMessageTime', 'desc')
@@ -222,6 +402,15 @@ async function loadGroups() {
         groups = [];
         const groupsContainer = document.getElementById('groups-tab');
         
+        if (!groupsContainer) {
+            console.error("❌ groups-tab element not found!");
+            return;
+        }
+        
+        // Clear existing content except the create group button
+        const existingGroups = groupsContainer.querySelectorAll('.chat-item:not(.btn-create-group)');
+        existingGroups.forEach(el => el.remove());
+        
         groupsSnapshot.forEach(doc => {
             const group = { id: doc.id, ...doc.data() };
             groups.push(group);
@@ -229,8 +418,12 @@ async function loadGroups() {
         });
         
         if (groupsSnapshot.empty) {
-            groupsContainer.innerHTML += '<div class="loading">No groups yet</div>';
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.textContent = 'No groups yet';
+            groupsContainer.appendChild(loadingDiv);
         }
+        
     } catch (error) {
         console.error('Error loading groups:', error);
     }
@@ -238,6 +431,11 @@ async function loadGroups() {
 
 function renderContacts() {
     const contactsContainer = document.getElementById('contacts-tab');
+    if (!contactsContainer) {
+        console.error("❌ contacts-tab element not found!");
+        return;
+    }
+    
     contactsContainer.innerHTML = '';
     
     contacts.forEach(contact => {
@@ -250,7 +448,7 @@ function renderContacts() {
                 <i class="fas fa-user"></i>
             </div>
             <div class="chat-content">
-                <h4>${contact.name}</h4>
+                <h4>${contact.name || 'Unknown'}</h4>
                 <p>${contact.email}</p>
             </div>
             <div class="status ${contact.isOnline ? 'online' : 'offline'}">
@@ -267,7 +465,6 @@ function renderChatItem(chat, container) {
     chatElement.className = 'chat-item';
     chatElement.onclick = () => openChat(chat.id);
     
-    // Get other participant info
     const otherUserId = chat.participants.find(id => id !== currentUser.uid);
     const otherUser = contacts.find(c => c.id === otherUserId) || {};
     
@@ -310,7 +507,6 @@ function showTab(tabName) {
     document.querySelectorAll('.tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    event.target.classList.add('active');
     
     // Show correct content
     document.getElementById('chats-tab').style.display = tabName === 'chats' ? 'block' : 'none';
@@ -319,15 +515,52 @@ function showTab(tabName) {
 }
 
 // ============================
-// MESSAGING
+// MESSAGING FUNCTIONS
 // ============================
+
+async function startChat(contactId) {
+    try {
+        // Check if chat already exists
+        const existingChat = await firebase.firestore().collection('chats')
+            .where('participants', 'array-contains', currentUser.uid)
+            .where('participants', 'array-contains', contactId)
+            .where('isGroup', '==', false)
+            .limit(1)
+            .get();
+        
+        if (!existingChat.empty) {
+            // Open existing chat
+            const chatId = existingChat.docs[0].id;
+            await openChat(chatId);
+            return;
+        }
+        
+        // Create new chat
+        const chatRef = await firebase.firestore().collection('chats').add({
+            participants: [currentUser.uid, contactId],
+            isGroup: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: 'Chat started'
+        });
+        
+        await openChat(chatRef.id);
+        
+    } catch (error) {
+        console.error("Error starting chat:", error);
+        alert('Failed to start chat: ' + error.message);
+    }
+}
 
 async function openChat(chatId) {
     currentChat = chatId;
     
     // Hide "no chat" message
-    document.getElementById('no-chat').style.display = 'none';
-    document.getElementById('active-chat').style.display = 'flex';
+    const noChat = document.getElementById('no-chat');
+    const activeChat = document.getElementById('active-chat');
+    
+    if (noChat) noChat.style.display = 'none';
+    if (activeChat) activeChat.style.display = 'flex';
     
     // Load chat info
     await loadChatInfo(chatId);
@@ -335,42 +568,63 @@ async function openChat(chatId) {
     // Load messages
     await loadMessages(chatId);
     
-    // Mark messages as read
-    await markMessagesAsRead(chatId);
-    
-    // Update active chat in sidebar
+    // Mark as active in sidebar
     document.querySelectorAll('.chat-item').forEach(item => {
         item.classList.remove('active');
     });
-    event.target.closest('.chat-item').classList.add('active');
+    
+    // Find and activate this chat item
+    const chatItems = document.querySelectorAll('.chat-item');
+    chatItems.forEach(item => {
+        if (item.onclick && item.onclick.toString().includes(chatId)) {
+            item.classList.add('active');
+        }
+    });
 }
 
 async function loadChatInfo(chatId) {
-    const chatDoc = await db.collection('chats').doc(chatId).get();
-    const chatData = chatDoc.data();
-    
-    if (chatData.isGroup) {
-        // Group chat
-        document.getElementById('chat-title').textContent = chatData.name;
-        document.getElementById('chat-subtitle').textContent = `${chatData.participants.length} members`;
-        document.getElementById('chat-avatar-icon').className = 'fas fa-user-group';
-    } else {
-        // One-on-one chat
-        const otherUserId = chatData.participants.find(id => id !== currentUser.uid);
-        const otherUser = contacts.find(c => c.id === otherUserId) || {};
+    try {
+        const chatDoc = await firebase.firestore().collection('chats').doc(chatId).get();
+        const chatData = chatDoc.data();
         
-        document.getElementById('chat-title').textContent = otherUser.name || 'Unknown User';
-        document.getElementById('chat-subtitle').textContent = otherUser.isOnline ? 'Online' : 'Last seen recently';
-        document.getElementById('chat-avatar-icon').className = 'fas fa-user';
+        const chatTitle = document.getElementById('chat-title');
+        const chatSubtitle = document.getElementById('chat-subtitle');
+        const chatAvatarIcon = document.getElementById('chat-avatar-icon');
+        
+        if (!chatTitle || !chatSubtitle || !chatAvatarIcon) {
+            console.error("❌ Chat info elements not found!");
+            return;
+        }
+        
+        if (chatData.isGroup) {
+            chatTitle.textContent = chatData.name || 'Group Chat';
+            chatSubtitle.textContent = `${chatData.participants?.length || 0} members`;
+            chatAvatarIcon.className = 'fas fa-user-group';
+        } else {
+            const otherUserId = chatData.participants.find(id => id !== currentUser.uid);
+            const otherUser = contacts.find(c => c.id === otherUserId) || {};
+            
+            chatTitle.textContent = otherUser.name || 'Unknown User';
+            chatSubtitle.textContent = otherUser.isOnline ? 'Online' : 'Last seen recently';
+            chatAvatarIcon.className = 'fas fa-user';
+        }
+        
+    } catch (error) {
+        console.error("Error loading chat info:", error);
     }
 }
 
 async function loadMessages(chatId) {
     const messagesContainer = document.getElementById('messages-container');
+    if (!messagesContainer) {
+        console.error("❌ messages-container not found!");
+        return;
+    }
+    
     messagesContainer.innerHTML = '<div class="message-day"><span>Today</span></div>';
     
     try {
-        const messagesSnapshot = await db.collection('chats')
+        const messagesSnapshot = await firebase.firestore().collection('chats')
             .doc(chatId)
             .collection('messages')
             .orderBy('timestamp', 'desc')
@@ -389,80 +643,89 @@ async function loadMessages(chatId) {
         
         // Scroll to bottom
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
     } catch (error) {
         console.error('Error loading messages:', error);
     }
 }
 
 async function sendMessage() {
-    if (!currentChat || !currentUser) return;
-    
-    const input = document.getElementById('message-input');
-    const messageText = input.value.trim();
-    
-    if (!messageText && !selectedFile) return;
-    
-    // Get chat key (will generate if doesn't exist)
-    const chatKey = encryption.getChatKey(currentChat);
-    
-    let messageData = {
-        senderId: currentUser.uid,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        isEncrypted: true
-    };
-    
-    // Encrypt message
-    if (messageText) {
-        const encrypted = encryption.encryptMessage(messageText, currentChat);
-        messageData.text = encrypted.encrypted;
-        messageData.encryptionInfo = {
-            algorithm: encrypted.algorithm,
-            fingerprint: encryption.generateFingerprint(currentChat)
-        };
+    if (!currentChat || !currentUser) {
+        alert("No chat selected or user not logged in!");
+        return;
     }
     
-    // Handle file attachment
-    if (selectedFile) {
-        try {
-            // Encrypt file
-            const encryptedFile = await encryption.encryptFile(selectedFile, currentChat);
-            
-            // Upload to Firebase Storage
-            const storageRef = storage.ref();
-            const fileRef = storageRef.child(`chats/${currentChat}/${Date.now()}_${selectedFile.name}`);
-            
-            // Convert encrypted data to blob
-            const encryptedBlob = new Blob([encryptedFile.encrypted], { type: 'text/plain' });
-            
-            await fileRef.put(encryptedBlob);
-            const downloadURL = await fileRef.getDownloadURL();
-            
-            messageData.file = {
-                url: downloadURL,
-                name: encryptedFile.originalName,
-                type: encryptedFile.type,
-                size: encryptedFile.size,
-                isEncrypted: true
-            };
-            
-            // Clear file preview
-            clearAttachment();
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            alert('Failed to upload file');
-            return;
-        }
+    const input = document.getElementById('message-input');
+    if (!input) {
+        console.error("❌ message-input not found!");
+        return;
+    }
+    
+    const messageText = input.value.trim();
+    
+    if (!messageText && !selectedFile) {
+        alert("Please type a message or attach a file!");
+        return;
     }
     
     try {
+        // Get chat key
+        const chatKey = encryption.getChatKey(currentChat);
+        
+        let messageData = {
+            senderId: currentUser.uid,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            isEncrypted: true
+        };
+        
+        // Encrypt message text
+        if (messageText) {
+            const encrypted = encryption.encryptMessage(messageText, currentChat);
+            messageData.text = encrypted.encrypted;
+            messageData.encryptionInfo = {
+                algorithm: encrypted.algorithm,
+                fingerprint: encryption.generateFingerprint(currentChat)
+            };
+        }
+        
+        // Handle file attachment
+        if (selectedFile) {
+            try {
+                const encryptedFile = await encryption.encryptFile(selectedFile, currentChat);
+                
+                const storageRef = firebase.storage().ref();
+                const fileRef = storageRef.child(`chats/${currentChat}/${Date.now()}_${selectedFile.name}`);
+                
+                const encryptedBlob = new Blob([encryptedFile.encrypted], { type: 'text/plain' });
+                
+                await fileRef.put(encryptedBlob);
+                const downloadURL = await fileRef.getDownloadURL();
+                
+                messageData.file = {
+                    url: downloadURL,
+                    name: encryptedFile.originalName,
+                    type: encryptedFile.type,
+                    size: encryptedFile.size,
+                    isEncrypted: true
+                };
+                
+                clearAttachment();
+                
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                alert('Failed to upload file');
+                return;
+            }
+        }
+        
         // Add message to Firestore
-        const messageRef = await db.collection('chats')
+        const messageRef = await firebase.firestore().collection('chats')
             .doc(currentChat)
             .collection('messages')
             .add(messageData);
         
         // Update chat last message
-        await db.collection('chats').doc(currentChat).update({
+        await firebase.firestore().collection('chats').doc(currentChat).update({
             lastMessage: messageText || '📎 File',
             lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
             lastSenderId: currentUser.uid
@@ -480,16 +743,22 @@ async function sendMessage() {
         
         // Scroll to bottom
         const messagesContainer = document.getElementById('messages-container');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        console.log("✅ Message sent successfully!");
         
     } catch (error) {
         console.error('Error sending message:', error);
-        alert('Failed to send message');
+        alert('Failed to send message: ' + error.message);
     }
 }
 
 function renderMessage(message) {
     const messagesContainer = document.getElementById('messages-container');
+    if (!messagesContainer) return;
+    
     const isSent = message.senderId === currentUser.uid;
     
     const messageElement = document.createElement('div');
@@ -498,7 +767,6 @@ function renderMessage(message) {
     let content = '';
     
     if (message.text) {
-        // Decrypt message
         try {
             const decrypted = encryption.decryptMessage(message.text, currentChat);
             content = decrypted.text;
@@ -528,18 +796,18 @@ function renderMessage(message) {
     messagesContainer.appendChild(messageElement);
 }
 
-async function markMessagesAsRead(chatId) {
-    // Mark all unread messages as read
-    // Implementation depends on your message structure
-}
-
 // ============================
-// GROUPS
+// GROUP FUNCTIONS
 // ============================
 
 function showCreateGroupModal() {
     // Load available contacts
     const contactsContainer = document.getElementById('available-contacts');
+    if (!contactsContainer) {
+        console.error("❌ available-contacts element not found!");
+        return;
+    }
+    
     contactsContainer.innerHTML = '';
     
     contacts.forEach(contact => {
@@ -551,15 +819,14 @@ function showCreateGroupModal() {
             <div class="avatar small">
                 <i class="fas fa-user"></i>
             </div>
-            <span>${contact.name}</span>
+            <span>${contact.name || contact.email}</span>
         `;
         
         contactsContainer.appendChild(contactElement);
     });
     
     // Show modal
-    document.getElementById('modal-overlay').style.display = 'block';
-    document.getElementById('create-group-modal').style.display = 'block';
+    showModal('create-group-modal');
 }
 
 function toggleContactSelection(contactId) {
@@ -572,10 +839,18 @@ function toggleContactSelection(contactId) {
 }
 
 async function createGroup() {
-    const groupName = document.getElementById('group-name').value;
-    const description = document.getElementById('group-description').value;
+    const groupNameInput = document.getElementById('group-name');
+    const descriptionInput = document.getElementById('group-description');
     
-    if (!groupName.trim()) {
+    if (!groupNameInput || !descriptionInput) {
+        alert("Group form elements not found!");
+        return;
+    }
+    
+    const groupName = groupNameInput.value.trim();
+    const description = descriptionInput.value.trim();
+    
+    if (!groupName) {
         alert('Please enter a group name');
         return;
     }
@@ -593,7 +868,7 @@ async function createGroup() {
         const groupKey = encryption.generateSymmetricKey('temp_group_key');
         
         // Create group in Firestore
-        const groupRef = await db.collection('chats').add({
+        const groupRef = await firebase.firestore().collection('chats').add({
             name: groupName,
             description: description,
             participants: allParticipants,
@@ -601,7 +876,7 @@ async function createGroup() {
             isGroup: true,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
-            encryptionKey: groupKey // In real app, encrypt this with each user's public key
+            encryptionKey: groupKey
         });
         
         // Close modal
@@ -609,8 +884,11 @@ async function createGroup() {
         
         // Clear selection
         selectedContacts = [];
-        document.getElementById('group-name').value = '';
-        document.getElementById('group-description').value = '';
+        groupNameInput.value = '';
+        descriptionInput.value = '';
+        
+        // Refresh groups list
+        await loadGroups();
         
         // Open the new group
         await openChat(groupRef.id);
@@ -618,16 +896,17 @@ async function createGroup() {
         // Send welcome message
         setTimeout(async () => {
             const input = document.getElementById('message-input');
-            input.value = `Welcome to "${groupName}"! This group is end-to-end encrypted.`;
-            await sendMessage();
+            if (input) {
+                input.value = `Welcome to "${groupName}"! This group is end-to-end encrypted.`;
+                await sendMessage();
+            }
         }, 1000);
         
-        // Refresh groups list
-        await loadGroups();
+        console.log("✅ Group created successfully!");
         
     } catch (error) {
         console.error('Error creating group:', error);
-        alert('Failed to create group');
+        alert('Failed to create group: ' + error.message);
     }
 }
 
@@ -635,11 +914,11 @@ async function createGroup() {
 // FILE ATTACHMENTS
 // ============================
 
-let selectedFile = null;
-
 function toggleAttachment() {
     const menu = document.getElementById('attachment-menu');
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
 }
 
 function attachFile(type) {
@@ -659,24 +938,28 @@ function attachFile(type) {
     input.click();
     
     // Hide menu
-    document.getElementById('attachment-menu').style.display = 'none';
+    const menu = document.getElementById('attachment-menu');
+    if (menu) menu.style.display = 'none';
 }
 
 function showFilePreview(file) {
     const preview = document.getElementById('file-preview');
     const fileName = document.getElementById('file-name');
     
-    fileName.textContent = file.name;
-    preview.style.display = 'block';
+    if (preview && fileName) {
+        fileName.textContent = file.name;
+        preview.style.display = 'block';
+    }
 }
 
 function clearAttachment() {
     selectedFile = null;
-    document.getElementById('file-preview').style.display = 'none';
+    const preview = document.getElementById('file-preview');
+    if (preview) preview.style.display = 'none';
 }
 
 // ============================
-// UI HELPERS
+// UI HELPER FUNCTIONS
 // ============================
 
 function formatTime(timestamp) {
@@ -701,21 +984,37 @@ function adjustTextareaHeight(textarea) {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
 }
 
-function handleKeyDown(event) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
+function showSettings() {
+    showModal('settings-modal');
+}
+
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    const overlay = document.getElementById('modal-overlay');
+    
+    if (modal && overlay) {
+        modal.style.display = 'block';
+        overlay.style.display = 'block';
     }
 }
 
-function showSettings() {
-    document.getElementById('modal-overlay').style.display = 'block';
-    document.getElementById('settings-modal').style.display = 'block';
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    const overlay = document.getElementById('modal-overlay');
+    
+    if (modal) modal.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
 }
 
-function closeModal(modalId) {
-    document.getElementById('modal-overlay').style.display = 'none';
-    document.getElementById(modalId).style.display = 'none';
+function closeAllModals() {
+    const modals = document.querySelectorAll('.modal');
+    const overlay = document.getElementById('modal-overlay');
+    
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+    });
+    
+    if (overlay) overlay.style.display = 'none';
 }
 
 function exportEncryptionKeys() {
@@ -725,66 +1024,87 @@ function exportEncryptionKeys() {
 
 async function deleteAllMessages() {
     if (confirm('Are you sure? This will delete all your messages permanently.')) {
-        // Implementation depends on your data structure
         alert('Feature coming soon');
     }
 }
 
 // ============================
-// REALTIME LISTENERS
+// DEBUGGING FUNCTIONS
 // ============================
 
-function setupRealtimeListeners() {
-    if (!currentUser) return;
+function checkAllElements() {
+    console.log("=== CHECKING ALL ELEMENTS ===");
     
-    // Listen for new messages in current chat
-    if (currentChat) {
-        db.collection('chats')
-            .doc(currentChat)
-            .collection('messages')
-            .orderBy('timestamp', 'desc')
-            .limit(1)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                        const message = change.doc.data();
-                        if (message.senderId !== currentUser.uid) {
-                            renderMessage(message);
-                        }
-                    }
-                });
-            });
-    }
+    // Auth elements
+    checkElement('auth-screen');
+    checkElement('app-screen');
+    checkElement('login-email');
+    checkElement('login-password');
+    checkElement('register-name');
+    checkElement('register-email');
+    checkElement('register-password');
+    checkElement('auth-btn');
     
-    // Listen for online status changes
-    realtimeDb.ref('status').on('value', (snapshot) => {
-        // Update online status in UI
-    });
+    // App elements
+    checkElement('user-name');
+    checkElement('user-email');
+    checkElement('user-status');
+    checkElement('chats-tab');
+    checkElement('contacts-tab');
+    checkElement('groups-tab');
+    checkElement('no-chat');
+    checkElement('active-chat');
+    checkElement('message-input');
+    checkElement('send-btn');
+    checkElement('messages-container');
+    
+    console.log("=== ELEMENT CHECK COMPLETE ===");
 }
 
-// ============================
-// INITIALIZATION
-// ============================
-
-// Check auth state on load
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        await initializeUser(user);
+function checkElement(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        console.log(`✅ ${id}: FOUND`);
+    } else {
+        console.log(`❌ ${id}: NOT FOUND`);
     }
-});
+}
 
-// Initialize textarea auto-resize
-document.addEventListener('DOMContentLoaded', () => {
-    const textarea = document.getElementById('message-input');
-    if (textarea) {
-        textarea.addEventListener('input', function() {
-            adjustTextareaHeight(this);
-        });
+// Make functions globally available for onclick handlers
+window.login = login;
+window.register = register;
+window.loginWithGoogle = loginWithGoogle;
+window.showRegister = showRegister;
+window.showLogin = showLogin;
+window.logout = logout;
+window.showTab = showTab;
+window.sendMessage = sendMessage;
+window.showCreateGroupModal = showCreateGroupModal;
+window.toggleContactSelection = toggleContactSelection;
+window.createGroup = createGroup;
+window.toggleAttachment = toggleAttachment;
+window.attachFile = attachFile;
+window.clearAttachment = clearAttachment;
+window.showSettings = showSettings;
+window.closeModal = closeModal;
+window.exportEncryptionKeys = exportEncryptionKeys;
+window.deleteAllMessages = deleteAllMessages;
+window.suggestQuestion = function(q) {
+    const input = document.getElementById('message-input');
+    if (input) {
+        input.value = q;
+        adjustTextareaHeight(input);
+        input.focus();
     }
-    
-    // Close modals when clicking overlay
-    document.getElementById('modal-overlay').onclick = () => {
-        closeModal('create-group-modal');
-        closeModal('settings-modal');
-    };
-});
+};
+window.clearChat = function() {
+    const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+        messagesContainer.innerHTML = '<div class="message-day"><span>Today</span></div>';
+    }
+};
+
+// Debug on load
+setTimeout(() => {
+    console.log("App loaded. Type 'checkAllElements()' in console to check elements.");
+}, 1000);
