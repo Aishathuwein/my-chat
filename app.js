@@ -1,4 +1,35 @@
 // ============================
+// FIREBASE INITIALIZATION CHECK
+// ============================
+
+console.log("🔥 App.js loading...");
+
+// Wait for DOM AND Firebase to be ready
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log("✅ DOM loaded");
+    
+    // Check if Firebase is initialized
+    if (!firebase.apps.length) {
+        console.error("❌ Firebase not initialized! Initializing now...");
+        try {
+            // Firebase should already be initialized from index.html
+            // If not, initialize it here
+            const app = firebase.initializeApp(firebaseConfig);
+            console.log("✅ Firebase initialized in app.js");
+        } catch (error) {
+            console.error("❌ Failed to initialize Firebase:", error);
+            alert("Firebase initialization failed. Please check console.");
+            return;
+        }
+    }
+    
+    // Now continue with the rest of your code...
+    // [ALL YOUR EXISTING CODE GOES HERE]
+    
+    // Move everything from your current app.js INSIDE this function
+    // Keep all your existing code, just make sure it's inside this DOMContentLoaded event
+    
+});// ============================
 // MAIN APPLICATION
 // ============================
 
@@ -1107,4 +1138,5 @@ window.clearChat = function() {
 // Debug on load
 setTimeout(() => {
     console.log("App loaded. Type 'checkAllElements()' in console to check elements.");
+
 }, 1000);
