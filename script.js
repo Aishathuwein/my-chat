@@ -2,10 +2,10 @@
 // CONFIGURATION
 // ========================
 const CONFIG = {
-    SUPABASE_URL: 'YOUR_SUPABASE_URL', // Replace with your Supabase URL
-    SUPABASE_KEY: 'YOUR_SUPABASE_ANON_KEY', // Replace with your Supabase anon key
-    UPLOADTHING_TOKEN: 'YOUR_UPLOADTHING_TOKEN', // Optional for file uploads
-    OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY' // Optional for AI features
+    SUPABASE_URL: 'https://omcekwadhwwblkspzawj.supabase.co', // Replace with your Supabase URL
+    SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tY2Vrd2FkaHd3Ymxrc3B6YXdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NDI1ODksImV4cCI6MjA4NDIxODU4OX0.xo56BWIuGHa6i3Q3Bq4dPc01GAMrS9u0C1UWCTVddeM', // Replace with your Supabase anon key
+    UPLOADTHING_TOKEN: 'eyJhcGlLZXkiOiJza19saXZlX2RmNjg5MWE3YzUyMmQ5MWMxMjk5OTAyNGE5NmZkNmUwNzg5MGY3MmQ0NjhmMGRlYTM2OTc2YTQ2MTgxODQwYjQiLCJhcHBJZCI6IjY5NHJwaGhhcDAiLCJyZWdpb25zIjpbInNlYTEiXX0=', // Optional for file uploads
+    OPENAI_API_KEY: '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' // Optional for AI features
 };
 
 // ========================
