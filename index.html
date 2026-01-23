@@ -1,35 +1,117 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Free Chat App</title>
+    <title>Advanced Chat - Group & 1:1</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDK -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
+    <!-- Auth Screen -->
     <div id="auth-screen">
-        <h1>Welcome to Chat</h1>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="signUp()">Sign Up</button>
-        <button onclick="signIn()">Sign In</button>
-        <button onclick="signInWithGoogle()">Google Sign In</button>
+        <div class="auth-container">
+            <h1><i class="fas fa-comments"></i> Advanced Chat</h1>
+            <div class="auth-form">
+                <input type="email" id="email" placeholder="Email" class="auth-input">
+                <input type="password" id="password" placeholder="Password" class="auth-input">
+                <div class="auth-buttons">
+                    <button onclick="signUp()" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Sign Up
+                    </button>
+                    <button onclick="signIn()" class="btn btn-success">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                    <button onclick="signInWithGoogle()" class="btn btn-google">
+                        <i class="fab fa-google"></i> Google Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <!-- Main Chat Screen -->
     <div id="chat-screen" style="display:none;">
-        <div id="header">
-            <h2>Chat Room</h2>
-            <button onclick="signOut()">Logout</button>
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="user-info">
+                <img id="user-avatar" src="" alt="Avatar">
+                <span id="user-name"></span>
+                <button onclick="signOut()" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+            
+            <!-- Chat Type Selector -->
+            <div class="chat-type">
+                <button onclick="showGroupChat()" class="chat-type-btn active" id="btn-group">
+                    <i class="fas fa-users"></i> Group Chat
+                </button>
+                <button onclick="showPrivateChat()" class="chat-type-btn" id="btn-private">
+                    <i class="fas fa-user-friends"></i> Private Messages
+                </button>
+            </div>
+            
+            <!-- Online Users (for private chat) -->
+            <div id="online-users" class="online-users">
+                <h3><i class="fas fa-circle online-icon"></i> Online Users</h3>
+                <div id="users-list"></div>
+            </div>
+            
+            <!-- Create Group Button -->
+            <div id="create-group-section">
+                <button onclick="showCreateGroupModal()" class="btn-create-group">
+                    <i class="fas fa-plus-circle"></i> Create New Group
+                </button>
+            </div>
+            
+            <!-- Group List -->
+            <div id="groups-section">
+                <h3><i class="fas fa-layer-group"></i> Your Groups</h3>
+                <div id="groups-list"></div>
+            </div>
         </div>
-        <div id="messages"></div>
-        <div id="message-input">
-            <input type="text" id="message" placeholder="Type your message...">
-            <button onclick="sendMessage()">Send</button>
+
+        <!-- Main Chat Area -->
+        <div class="main-chat">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <h2 id="chat-title">Global Group Chat</h2>
+                <div id="chat-info"></div>
+            </div>
+            
+            <!-- Messages Container -->
+            <div class="messages-container">
+                <div id="messages"></div>
+            </div>
+            
+            <!-- Message Input -->
+            <div class="message-input-container">
+                <input type="text" id="message-input" placeholder="Type your message..." 
+                       onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()" class="btn-send">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
         </div>
     </div>
 
+    <!-- Modals -->
+    <div id="create-group-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>Create New Group</h3>
+            <input type="text" id="group-name" placeholder="Group Name">
+            <textarea id="group-description" placeholder="Group Description"></textarea>
+            <button onclick="createGroup()" class="btn-create">Create Group</button>
+        </div>
+    </div>
+
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
+    <!-- Main Script -->
     <script src="script.js"></script>
 </body>
 </html>
