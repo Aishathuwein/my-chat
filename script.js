@@ -1,3 +1,47 @@
+async function testChatSystem() {
+    console.log('=== Testing Chat System ===');
+    
+    // Test 1: Check Firebase connection
+    const connected = await testFirebase();
+    if (!connected) {
+        console.error('❌ Test 1 FAILED: Firebase not connected');
+        return;
+    }
+    console.log('✅ Test 1 PASSED: Firebase connected');
+    
+    // Test 2: Check user authentication
+    if (!currentUser) {
+        console.error('❌ Test 2 FAILED: User not authenticated');
+        return;
+    }
+    console.log('✅ Test 2 PASSED: User authenticated');
+    
+    // Test 3: Send test message
+    const testMessage = {
+        text: 'Test message ' + Date.now(),
+        senderId: currentUser.uid,
+        senderName: 'Test User',
+        type: 'global',
+        chatId: 'global',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    try {
+        await db.collection('messages').add(testMessage);
+        console.log('✅ Test 3 PASSED: Message sent successfully');
+    } catch (error) {
+        console.error('❌ Test 3 FAILED: Could not send message', error);
+    }
+    
+    console.log('=== Tests Complete ===');
+}
+
+// Run tests after login
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        setTimeout(testChatSystem, 2000); // Run tests 2 seconds after login
+    }
+});
 async function uploadFile(file) {
     const storageRef = firebase.storage().ref();
     const fileRef = storageRef.child(`files/${Date.now()}_${file.name}`);
