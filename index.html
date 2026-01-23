@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Complete Chat App</title>
+    <title>Complete Chat App - Fixed</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -18,7 +18,7 @@
         <div class="auth-container">
             <h1><i class="fas fa-comments"></i> Chat App</h1>
             <div class="auth-form">
-                <input type="email" id="email" placeholder="Email" value="test@test.com">
+                <input type="email" id="email" placeholder="Email" value="user1@test.com">
                 <input type="password" id="password" placeholder="Password" value="123456">
                 <div class="auth-buttons">
                     <button id="signup-btn" class="btn btn-primary">
@@ -33,8 +33,8 @@
                 </div>
                 <div class="test-info">
                     <p><strong>Test Accounts:</strong></p>
-                    <p>Email: test@test.com | Password: 123456</p>
-                    <p>Email: user@test.com | Password: 123456</p>
+                    <p>User 1: user1@test.com | Password: 123456</p>
+                    <p>User 2: user2@test.com | Password: 123456</p>
                 </div>
             </div>
         </div>
@@ -67,7 +67,7 @@
             </div>
 
             <!-- Online Users -->
-            <div class="section">
+            <div class="section" id="online-users-section">
                 <h3><i class="fas fa-circle online-dot"></i> Online Users</h3>
                 <div id="online-users-list" class="users-list">
                     <div class="loading">Loading users...</div>
@@ -75,7 +75,7 @@
             </div>
 
             <!-- Groups -->
-            <div class="section">
+            <div class="section" id="groups-section">
                 <h3><i class="fas fa-layer-group"></i> Your Groups</h3>
                 <div id="groups-list" class="groups-list">
                     <div class="group-item active" data-group-id="global">
@@ -126,6 +126,15 @@
             <div class="modal-body">
                 <input type="text" id="group-name" placeholder="Enter group name">
                 <textarea id="group-description" placeholder="Group description (optional)"></textarea>
+                
+                <!-- Group Members Selection -->
+                <div class="members-selection">
+                    <h4>Select Group Members:</h4>
+                    <div id="available-users-list" class="available-users">
+                        <!-- Available users will be added here -->
+                    </div>
+                </div>
+                
                 <button id="create-group-submit" class="btn-create">Create Group</button>
             </div>
         </div>

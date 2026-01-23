@@ -1,10 +1,10 @@
 // ============================================
 // FIREBASE CONFIGURATION
-// REPLACE THESE VALUES WITH YOUR OWN FROM FIREBASE
 // ============================================
 
-// Your Firebase configuration
+// IMPORTANT: REPLACE THESE VALUES WITH YOUR OWN FROM FIREBASE
 const firebaseConfig = {
+   
   apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
   authDomain: "my-chat-app-e1a85.firebaseapp.com",
   databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
@@ -15,7 +15,7 @@ const firebaseConfig = {
 
 };
 
-console.log("Initializing Firebase...");
+console.log("🔥 Initializing Firebase...");
 
 // Initialize Firebase
 try {
@@ -31,9 +31,16 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // Enable offline persistence
-db.enablePersistence().catch((err) => {
-    console.log("Persistence failed:", err);
-});
+db.enablePersistence()
+    .then(() => console.log("📦 Offline persistence enabled"))
+    .catch((err) => {
+        console.log("📦 Persistence failed:", err);
+        if (err.code === 'failed-precondition') {
+            console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+        } else if (err.code === 'unimplemented') {
+            console.log("The current browser doesn't support persistence.");
+        }
+    });
 
 console.log("✅ Firebase services initialized");
 
