@@ -1,464 +1,319 @@
-// Global variables
-let currentUser = null;
-let currentChatType = 'group'; // 'group' or 'private'
-let currentChatId = 'global'; // Default group
-let currentRecipientId = null;
-let onlineUsers = {};
-let groups = [];
-
-// DOM Elements
-const authScreen = document.getElementById('auth-screen');
-const chatScreen = document.getElementById('chat-screen');
-const userName = document.getElementById('user-name');
-const userAvatar = document.getElementById('user-avatar');
-const usersList = document.getElementById('users-list');
-const groupsList = document.getElementById('groups-list');
-const messagesDiv = document.getElementById('messages');
-const messageInput = document.getElementById('message-input');
-const chatTitle = document.getElementById('chat-title');
-const chatInfo = document.getElementById('chat-info');
-const createGroupModal = document.getElementById('create-group-modal');
-
-// Initialize when page loads
-window.onload = function() {
-    // Set up auth state listener
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            currentUser = user;
-            setupUser(user);
-            showChatScreen();
-            loadInitialData();
-        } else {
-            showAuthScreen();
-        }
-    });
-};
-
-// Setup user info
-function setupUser(user) {
-    userName.textContent = user.displayName || user.email.split('@')[0];
-    userAvatar.textContent = (user.displayName || user.email[0]).toUpperCase();
-    userAvatar.style.backgroundColor = getRandomColor();
-}
-
-// Authentication Functions
-async function signUp() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+async function uploadFile(file) {
+    const storageRef = firebase.storage().ref();
+    const fileRef = storageRef.child(`files/${Date.now()}_${file.name}`);
     
-    if (!email || !password) {
-        alert('Please enter email and password');
-        return;
-    }
+    await fileRef.put(file);
+    const url = await fileRef.getDownloadURL();
     
-    try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        // Update profile
-        await userCredential.user.updateProfile({
-            displayName: email.split('@')[0]
-        });
-        alert('Account created successfully!');
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
-async function signIn() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    try {
-        await auth.signInWithEmailAndPassword(email, password);
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
-async function signInWithGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-        await auth.signInWithPopup(provider);
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
-function signOut() {
-    if (currentUser) {
-        // Update user status to offline
-        db.collection('users').doc(currentUser.uid).update({
-            isOnline: false,
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    }
-    auth.signOut();
-}
-
-// Screen Management
-function showAuthScreen() {
-    authScreen.style.display = 'flex';
-    chatScreen.style.display = 'none';
-    currentUser = null;
-}
-
-function showChatScreen() {
-    authScreen.style.display = 'none';
-    chatScreen.style.display = 'flex';
-}
-
-// Chat Type Switching
-function showGroupChat() {
-    currentChatType = 'group';
-    document.getElementById('btn-group').classList.add('active');
-    document.getElementById('btn-private').classList.remove('active');
-    document.getElementById('online-users').style.display = 'block';
-    document.getElementById('create-group-section').style.display = 'block';
-    loadGroups();
-    switchToChat('global', 'Global Group Chat');
-}
-
-function showPrivateChat() {
-    currentChatType = 'private';
-    document.getElementById('btn-group').classList.remove('active');
-    document.getElementById('btn-private').classList.add('active');
-    document.getElementById('online-users').style.display = 'block';
-    document.getElementById('create-group-section').style.display = 'none';
-    loadOnlineUsers();
-}
-
-// Database Functions
-async function loadInitialData() {
-    if (!currentUser) return;
-    
-    // Create/Update user document
-    await db.collection('users').doc(currentUser.uid).set({
-        uid: currentUser.uid,
-        email: currentUser.email,
-        displayName: currentUser.displayName || currentUser.email.split('@')[0],
-        isOnline: true,
-        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    
-    // Set up presence tracking
-    setupPresenceTracking();
-    
-    // Load data based on chat type
-    if (currentChatType === 'group') {
-        loadGroups();
-    } else {
-        loadOnlineUsers();
-    }
-    
-    // Load global chat by default
-    switchToChat('global', 'Global Group Chat');
-}
-
-function setupPresenceTracking() {
-    // Update user status when online/offline
-    const userStatusRef = db.collection('users').doc(currentUser.uid);
-    
-    // Update to online
-    userStatusRef.update({
-        isOnline: true,
-        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
-    // Update to offline when user disconnects
-    window.addEventListener('beforeunload', () => {
-        userStatusRef.update({
-            isOnline: false,
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-        });
+    await sendMessage({
+        text: `File: ${file.name}`,
+        fileUrl: url,
+        fileName: file.name,
+        fileType: file.type
     });
 }
-
-async function loadOnlineUsers() {
-    usersList.innerHTML = '<div class="loading">Loading users...</div>';
+async function markAsRead(messageId) {
+    await db.collection('messages').doc(messageId).update({
+        read: true,
+        readAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+}
+let typingTimeout;
+function showTypingIndicator() {
+    clearTimeout(typingTimeout);
     
-    // Listen for real-time updates
-    db.collection('users')
-        .where('uid', '!=', currentUser.uid)
-        .onSnapshot(snapshot => {
-            usersList.innerHTML = '';
-            onlineUsers = {};
-            
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                onlineUsers[user.uid] = user;
-                
-                const userElement = document.createElement('div');
-                userElement.className = 'user-item';
-                userElement.innerHTML = `
-                    <div class="user-status" style="background: ${user.isOnline ? '#48bb78' : '#718096'}"></div>
-                    <span>${user.displayName}</span>
-                    <small>${user.isOnline ? 'Online' : 'Offline'}</small>
-                `;
-                
-                userElement.onclick = () => startPrivateChat(user.uid, user.displayName);
-                usersList.appendChild(userElement);
-            });
-            
-            if (snapshot.empty) {
-                usersList.innerHTML = '<div class="no-users">No other users online</div>';
-            }
+    db.collection('typing').doc(currentChatId).set({
+        userId: currentUser.uid,
+        userName: currentUser.displayName,
+        typing: true,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    typingTimeout = setTimeout(() => {
+        db.collection('typing').doc(currentChatId).update({
+            typing: false
         });
+    }, 1000);
+}
+async function addReaction(messageId, emoji) {
+    await db.collection('messages').doc(messageId).update({
+        [`reactions.${emoji}`]: firebase.firestore.FieldValue.increment(1)
+    });
+}
+// Debug functions
+function toggleDebug() {
+    const panel = document.getElementById('debug-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
-async function loadGroups() {
-    groupsList.innerHTML = '<div class="loading">Loading groups...</div>';
+function updateDebugInfo() {
+    const debugInfo = document.getElementById('debug-info');
+    if (!debugInfo) return;
     
-    // Load all groups
-    db.collection('groups')
-        .where('members', 'array-contains', currentUser.uid)
-        .onSnapshot(snapshot => {
-            groupsList.innerHTML = '';
-            groups = [];
-            
-            snapshot.forEach(doc => {
-                const group = { id: doc.id, ...doc.data() };
-                groups.push(group);
-                
-                const groupElement = document.createElement('div');
-                groupElement.className = 'group-item';
-                if (group.id === currentChatId) {
-                    groupElement.classList.add('active');
-                }
-                
-                groupElement.innerHTML = `
-                    <i class="fas fa-users"></i>
-                    <div>
-                        <strong>${group.name}</strong>
-                        <small>${group.members.length} members</small>
-                    </div>
-                `;
-                
-                groupElement.onclick = () => switchToGroup(group.id, group.name);
-                groupsList.appendChild(groupElement);
-            });
-            
-            // Add global group
-            const globalGroupElement = document.createElement('div');
-            globalGroupElement.className = `group-item ${currentChatId === 'global' ? 'active' : ''}`;
-            globalGroupElement.innerHTML = `
-                <i class="fas fa-globe"></i>
-                <div>
-                    <strong>Global Chat</strong>
-                    <small>Everyone</small>
-                </div>
-            `;
-            globalGroupElement.onclick = () => switchToChat('global', 'Global Group Chat');
-            groupsList.prepend(globalGroupElement);
-        });
+    debugInfo.innerHTML = `
+        <div>User: ${currentUser ? currentUser.uid : 'Not logged in'}</div>
+        <div>Chat Type: ${currentChatType}</div>
+        <div>Chat ID: ${currentChatId}</div>
+        <div>Recipient: ${currentRecipientId || 'None'}</div>
+        <div>Online Users: ${Object.keys(onlineUsers).length}</div>
+    `;
 }
 
-function switchToChat(chatId, title) {
-    currentChatId = chatId;
-    currentRecipientId = null;
-    chatTitle.textContent = title;
-    chatInfo.textContent = currentChatType === 'group' ? 'Group Chat' : 'Direct Message';
-    
-    // Clear previous listener
-    if (window.chatListener) {
-        window.chatListener();
-    }
-    
-    // Clear messages
-    messagesDiv.innerHTML = '';
-    
-    // Set up new listener based on chat type
-    if (currentChatType === 'group') {
-        if (chatId === 'global') {
-            listenToGlobalChat();
-        } else {
-            listenToGroupChat(chatId);
-        }
-    } else {
-        listenToPrivateChat(chatId);
-    }
+// Update debug info periodically
+setInterval(updateDebugInfo, 2000);
+
+// Show debug panel by default during development
+document.getElementById('debug-panel').style.display = 'block';
+// =================== MESSAGE FUNCTIONS ===================
+
+// Fix: Generate chat ID for private messages
+function generateChatId(user1, user2) {
+    return [user1, user2].sort().join('_');
 }
 
-function startPrivateChat(recipientId, recipientName) {
-    currentChatType = 'private';
-    currentRecipientId = recipientId;
-    
-    // Generate unique chat ID for the pair
-    const chatId = [currentUser.uid, recipientId].sort().join('_');
-    chatTitle.textContent = `Chat with ${recipientName}`;
-    chatInfo.textContent = 'Direct Message';
-    
-    switchToChat(chatId, `Chat with ${recipientName}`);
-}
-
-// Chat Listening Functions
-function listenToGlobalChat() {
-    window.chatListener = db.collection('messages')
-        .where('type', '==', 'global')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-            messagesDiv.innerHTML = '';
-            snapshot.forEach(doc => {
-                displayMessage(doc.data());
-            });
-            scrollToBottom();
-        });
-}
-
-function listenToGroupChat(groupId) {
-    window.chatListener = db.collection('messages')
-        .where('type', '==', 'group')
-        .where('groupId', '==', groupId)
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-            messagesDiv.innerHTML = '';
-            snapshot.forEach(doc => {
-                displayMessage(doc.data());
-            });
-            scrollToBottom();
-        });
-}
-
-function listenToPrivateChat(chatId) {
-    window.chatListener = db.collection('messages')
-        .where('type', '==', 'private')
-        .where('chatId', '==', chatId)
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-            messagesDiv.innerHTML = '';
-            snapshot.forEach(doc => {
-                displayMessage(doc.data());
-            });
-            scrollToBottom();
-        });
-}
-
-// Message Functions
+// Fix: Improved sendMessage function
 async function sendMessage() {
     const messageText = messageInput.value.trim();
-    if (!messageText || !currentUser) return;
-    
-    const messageData = {
-        text: messageText,
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || currentUser.email.split('@')[0],
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    };
+    if (!messageText || !currentUser) {
+        console.log('No message text or user not logged in');
+        return;
+    }
+
+    console.log('Sending message:', messageText);
+    console.log('Current chat type:', currentChatType);
+    console.log('Current chat ID:', currentChatId);
+    console.log('Current recipient ID:', currentRecipientId);
+
+    try {
+        const messageData = {
+            text: messageText,
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName || currentUser.email.split('@')[0],
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+        };
+
+        // Determine message type and set appropriate fields
+        if (currentChatType === 'group') {
+            if (currentChatId === 'global') {
+                messageData.type = 'global';
+                messageData.chatId = 'global';
+                console.log('Sending global message');
+            } else {
+                messageData.type = 'group';
+                messageData.chatId = currentChatId;
+                messageData.groupId = currentChatId;
+                console.log('Sending group message to:', currentChatId);
+            }
+        } else if (currentChatType === 'private' && currentRecipientId) {
+            messageData.type = 'private';
+            messageData.chatId = generateChatId(currentUser.uid, currentRecipientId);
+            messageData.senderUid = currentUser.uid;
+            messageData.receiverUid = currentRecipientId;
+            console.log('Sending private message to:', currentRecipientId);
+        } else {
+            console.error('Invalid chat state');
+            return;
+        }
+
+        // Add message to database
+        const docRef = await db.collection('messages').add(messageData);
+        console.log('✅ Message sent successfully with ID:', docRef.id);
+        
+        // Clear input
+        messageInput.value = '';
+        
+        // Auto-scroll to bottom
+        setTimeout(scrollToBottom, 100);
+        
+    } catch (error) {
+        console.error('❌ Error sending message:', error);
+        alert('Failed to send message: ' + error.message);
+    }
+}
+
+// Fix: Listen to messages based on chat type
+function setupMessageListener() {
+    // Remove previous listener if exists
+    if (window.messageListener) {
+        window.messageListener();
+    }
+
+    console.log('Setting up message listener for:', currentChatType, currentChatId);
+
+    let query;
     
     if (currentChatType === 'group') {
         if (currentChatId === 'global') {
-            messageData.type = 'global';
+            query = db.collection('messages')
+                .where('type', '==', 'global')
+                .orderBy('timestamp', 'asc');
         } else {
-            messageData.type = 'group';
-            messageData.groupId = currentChatId;
+            query = db.collection('messages')
+                .where('type', '==', 'group')
+                .where('chatId', '==', currentChatId)
+                .orderBy('timestamp', 'asc');
         }
+    } else if (currentChatType === 'private' && currentRecipientId) {
+        const chatId = generateChatId(currentUser.uid, currentRecipientId);
+        query = db.collection('messages')
+            .where('type', '==', 'private')
+            .where('chatId', '==', chatId)
+            .orderBy('timestamp', 'asc');
     } else {
-        messageData.type = 'private';
-        messageData.chatId = currentChatId; // This is the unique chat ID for the pair
-        messageData.recipientId = currentRecipientId;
+        console.error('Cannot setup listener: invalid chat state');
+        return;
     }
-    
-    try {
-        await db.collection('messages').add(messageData);
-        messageInput.value = '';
-    } catch (error) {
-        console.error('Error sending message:', error);
-        alert('Failed to send message');
-    }
+
+    // Set up real-time listener
+    window.messageListener = query.onSnapshot(
+        (snapshot) => {
+            console.log('📨 New messages received:', snapshot.docs.length);
+            
+            // Clear messages only on first load
+            if (!messagesDiv.dataset.initialized) {
+                messagesDiv.innerHTML = '';
+                messagesDiv.dataset.initialized = 'true';
+            }
+            
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const message = change.doc.data();
+                    displayMessage(message);
+                }
+            });
+            
+            scrollToBottom();
+        },
+        (error) => {
+            console.error('❌ Error listening to messages:', error);
+        }
+    );
 }
 
+// Fix: Display message with better formatting
 function displayMessage(message) {
+    if (!message.senderName || !message.text) {
+        console.warn('Invalid message data:', message);
+        return;
+    }
+
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${message.senderId === currentUser.uid ? 'message-sent' : 'message-received'}`;
+    const isCurrentUser = message.senderId === currentUser.uid;
+    
+    messageDiv.className = `message ${isCurrentUser ? 'message-sent' : 'message-received'}`;
     
     const time = message.timestamp ? 
-        new Date(message.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+        new Date(message.timestamp.toDate()).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        }) : 
         'Just now';
-    
+
     messageDiv.innerHTML = `
         <div class="message-content">
-            <div class="message-sender">${message.senderName}</div>
+            <div class="message-sender">
+                ${isCurrentUser ? 'You' : message.senderName}
+            </div>
             <div class="message-text">${message.text}</div>
             <div class="message-info">
-                <span>${time}</span>
+                <span class="message-time">${time}</span>
+                ${isCurrentUser ? '<span class="message-status">✓✓</span>' : ''}
             </div>
         </div>
     `;
-    
+
     messagesDiv.appendChild(messageDiv);
+    
+    // Add animation
+    messageDiv.style.animation = 'fadeIn 0.3s';
 }
 
+// Fix: Scroll to bottom function
 function scrollToBottom() {
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-// Group Management
-function showCreateGroupModal() {
-    createGroupModal.style.display = 'flex';
-}
-
-function closeModal() {
-    createGroupModal.style.display = 'none';
-}
-
-async function createGroup() {
-    const groupName = document.getElementById('group-name').value.trim();
-    const description = document.getElementById('group-description').value.trim();
-    
-    if (!groupName) {
-        alert('Please enter a group name');
-        return;
-    }
-    
-    try {
-        const groupData = {
-            name: groupName,
-            description: description,
-            createdBy: currentUser.uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            members: [currentUser.uid]
-        };
-        
-        const docRef = await db.collection('groups').add(groupData);
-        
-        // Add creator as admin
-        await db.collection('groupMembers').add({
-            groupId: docRef.id,
-            userId: currentUser.uid,
-            role: 'admin',
-            joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        alert('Group created successfully!');
-        closeModal();
-        document.getElementById('group-name').value = '';
-        document.getElementById('group-description').value = '';
-        
-        // Switch to the new group
-        switchToGroup(docRef.id, groupName);
-    } catch (error) {
-        console.error('Error creating group:', error);
-        alert('Failed to create group');
+    const messagesContainer = document.querySelector('.messages-container');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }
 
+// Fix: Switch chat function
+function switchToChat(chatId, title) {
+    console.log('Switching to chat:', chatId, title);
+    
+    currentChatId = chatId;
+    chatTitle.textContent = title;
+    
+    // Reset message div
+    messagesDiv.innerHTML = '';
+    delete messagesDiv.dataset.initialized;
+    
+    // Set chat info
+    if (currentChatType === 'group') {
+        chatInfo.textContent = chatId === 'global' ? 'Public Group' : 'Private Group';
+    } else {
+        chatInfo.textContent = 'Direct Message';
+    }
+    
+    // Set up message listener
+    setupMessageListener();
+    
+    // Highlight active chat
+    highlightActiveChat();
+}
+
+// Fix: Start private chat
+function startPrivateChat(recipientId, recipientName) {
+    console.log('Starting private chat with:', recipientId, recipientName);
+    
+    currentChatType = 'private';
+    currentRecipientId = recipientId;
+    
+    // Update UI
+    document.getElementById('btn-group').classList.remove('active');
+    document.getElementById('btn-private').classList.add('active');
+    
+    // Generate chat ID
+    const chatId = generateChatId(currentUser.uid, recipientId);
+    
+    // Switch to chat
+    switchToChat(chatId, `Chat with ${recipientName}`);
+}
+
+// Fix: Switch to group
 function switchToGroup(groupId, groupName) {
+    console.log('Switching to group:', groupId, groupName);
+    
     currentChatType = 'group';
     currentChatId = groupId;
+    currentRecipientId = null;
+    
+    // Update UI
+    document.getElementById('btn-group').classList.add('active');
+    document.getElementById('btn-private').classList.remove('active');
+    
+    // Switch to chat
     switchToChat(groupId, groupName);
 }
 
-// Utility Functions
-function getRandomColor() {
-    const colors = ['#667eea', '#764ba2', '#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac'];
-    return colors[Math.floor(Math.random() * colors.length)];
-}
-
-// Event Listeners
-window.onclick = function(event) {
-    if (event.target === createGroupModal) {
-        closeModal();
+// Fix: Highlight active chat
+function highlightActiveChat() {
+    // Remove active class from all
+    document.querySelectorAll('.user-item, .group-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Add active class to current chat
+    if (currentChatType === 'private' && currentRecipientId) {
+        const userItem = Array.from(document.querySelectorAll('.user-item')).find(item => 
+            item.textContent.includes(onlineUsers[currentRecipientId]?.displayName)
+        );
+        if (userItem) userItem.classList.add('active');
+    } else if (currentChatType === 'group') {
+        const groupItem = Array.from(document.querySelectorAll('.group-item')).find(item => 
+            item.dataset.groupId === currentChatId || 
+            (currentChatId === 'global' && item.textContent.includes('Global'))
+        );
+        if (groupItem) groupItem.classList.add('active');
     }
-};
-
-// Initialize
-initializeDatabase();
+}
