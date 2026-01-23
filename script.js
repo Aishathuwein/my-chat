@@ -1,3 +1,27 @@
+console.log("✅ script.js loaded successfully!");
+
+// Test if buttons can be clicked
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("✅ DOM fully loaded and parsed");
+    
+    // Add click event listeners to test buttons
+    const testButton = document.createElement('button');
+    testButton.textContent = 'Test Click';
+    testButton.style.position = 'fixed';
+    testButton.style.top = '10px';
+    testButton.style.right = '10px';
+    testButton.style.zIndex = '9999';
+    testButton.style.backgroundColor = 'red';
+    testButton.style.color = 'white';
+    testButton.style.padding = '10px';
+    testButton.onclick = function() {
+        alert('JavaScript is working!');
+        console.log('Test button clicked!');
+    };
+    document.body.appendChild(testButton);
+    
+    console.log('Test button added. Click it to see if JavaScript works.');
+});
 async function testChatSystem() {
     console.log('=== Testing Chat System ===');
     
