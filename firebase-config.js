@@ -4,12 +4,14 @@
 
 // IMPORTANT: REPLACE THESE VALUES WITH YOUR OWN FROM FIREBASE CONSOLE
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
+  authDomain: "my-chat-app-e1a85.firebaseapp.com",
+  databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
+  projectId: "my-chat-app-e1a85",
+  storageBucket: "my-chat-app-e1a85.firebasestorage.app",
+  messagingSenderId: "1018726193704",
+  appId: "1:1018726193704:web:58ff7905d107248e86331d"
+
 };
 
 console.log("🔥 Initializing Firebase...");
@@ -233,5 +235,6 @@ if (typeof firebase.performance !== 'undefined') {
     const perf = firebase.performance();
     console.log("📊 Firebase Performance Monitoring enabled");
 }
+
 
 console.log("🚀 Firebase configuration complete and ready!");
