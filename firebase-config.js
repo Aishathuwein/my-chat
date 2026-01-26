@@ -2,7 +2,7 @@
 // FIREBASE CONFIGURATION
 // ============================================
 
-// IMPORTANT: Replace with your Firebase config
+// 🔥 REPLACE WITH YOUR FIREBASE CONFIG!
 const firebaseConfig = {
   apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
   authDomain: "my-chat-app-e1a85.firebaseapp.com",
@@ -21,12 +21,13 @@ try {
     firebase.initializeApp(firebaseConfig);
     console.log("✅ Firebase initialized successfully");
     
-    // Show notification
-    showNotification("Firebase Connected", "success");
+    // Update connection status
+    updateConnectionStatus('connected');
     
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    showNotification("Firebase connection failed", "error");
+    updateConnectionStatus('error');
+    alert("Firebase failed to initialize. Check console for details.");
 }
 
 // Initialize services
@@ -38,31 +39,92 @@ const storage = firebase.storage();
 db.enablePersistence()
     .then(() => {
         console.log("📦 Offline persistence enabled");
-        showNotification("Offline mode enabled", "info");
+        logDebug("Offline mode enabled", "info");
     })
     .catch((err) => {
-        console.log("📦 Persistence failed:", err);
+        console.log("📦 Persistence error:", err);
         if (err.code === 'failed-precondition') {
-            console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+            logDebug("Multiple tabs open, persistence can only be enabled in one tab", "warning");
         } else if (err.code === 'unimplemented') {
-            console.log("The current browser doesn't support persistence.");
+            logDebug("Browser doesn't support persistence", "warning");
         }
     });
 
-// Helper function for notifications (defined here to use early)
-function showNotification(title, type = "info", message = "") {
-    if (typeof window.showAppNotification === 'function') {
-        window.showAppNotification(title, type, message);
-    } else {
-        console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+// Connection monitoring
+let isOnline = navigator.onLine;
+const connectionRef = db.collection('connections').doc('status');
+
+// Monitor online/offline status
+window.addEventListener('online', () => {
+    isOnline = true;
+    updateConnectionStatus('connected');
+    logDebug("Online", "info");
+});
+
+window.addEventListener('offline', () => {
+    isOnline = false;
+    updateConnectionStatus('disconnected');
+    logDebug("Offline", "warning");
+});
+
+// Monitor Firebase connection
+db.enableNetwork()
+    .then(() => {
+        console.log("🌐 Firebase network enabled");
+        updateConnectionStatus('connected');
+    })
+    .catch((err) => {
+        console.error("🌐 Firebase network error:", err);
+        updateConnectionStatus('error');
+    });
+
+// Helper functions
+function updateConnectionStatus(status) {
+    const dot = document.getElementById('connection-dot');
+    const text = document.getElementById('connection-text');
+    
+    switch(status) {
+        case 'connected':
+            dot.className = 'connected';
+            text.textContent = 'Connected';
+            dot.style.animation = 'none';
+            break;
+        case 'connecting':
+            dot.className = '';
+            text.textContent = 'Connecting...';
+            dot.style.animation = 'pulse 2s infinite';
+            break;
+        case 'disconnected':
+            dot.className = '';
+            text.textContent = 'Disconnected';
+            dot.style.animation = 'pulse 1s infinite';
+            break;
+        case 'error':
+            dot.className = '';
+            text.textContent = 'Connection Error';
+            dot.style.animation = 'pulse 0.5s infinite';
+            break;
     }
 }
 
-// Export for use in other files
+function logDebug(message, type = 'info') {
+    const debugContent = document.getElementById('debug-content');
+    if (debugContent) {
+        const item = document.createElement('div');
+        item.className = `debug-item ${type}`;
+        item.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        debugContent.appendChild(item);
+        debugContent.scrollTop = debugContent.scrollHeight;
+    }
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+// Export for use in app.js
 window.auth = auth;
 window.db = db;
 window.storage = storage;
 window.firebase = firebase;
-window.showFirebaseNotification = showNotification;
+window.logDebug = logDebug;
+window.updateConnectionStatus = updateConnectionStatus;
 
-console.log("✅ Firebase services initialized");
+console.log("✅ Firebase services ready");

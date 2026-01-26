@@ -2,14 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#667eea">
-    <meta name="description" content="Modern Chat App with audio messages and file sharing">
-    <title>Modern Chat App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App - Real Time</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -18,29 +14,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 </head>
 <body>
-    <!-- Splash Screen -->
-    <div id="splash-screen" class="splash-screen">
-        <div class="splash-content">
-            <div class="splash-logo">
-                <i class="fas fa-comments"></i>
-            </div>
-            <h1>Modern Chat</h1>
-            <p>Connecting people worldwide</p>
-            <div class="splash-loader"></div>
-        </div>
-    </div>
-
     <!-- Auth Screen -->
-    <div id="auth-screen" class="screen">
+    <div id="auth-screen">
         <div class="auth-container">
-            <div class="auth-header">
-                <div class="logo">
-                    <i class="fas fa-comments"></i>
-                    <span>Modern Chat</span>
-                </div>
-                <p class="tagline">Connect, chat, share - anywhere</p>
-            </div>
-            
+            <h1><i class="fas fa-comments"></i> Chat App</h1>
             <div class="auth-tabs">
                 <button class="auth-tab active" data-tab="login">Login</button>
                 <button class="auth-tab" data-tab="signup">Sign Up</button>
@@ -48,195 +25,111 @@
             
             <div class="auth-form active" id="login-form">
                 <div class="form-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" id="login-email" placeholder="Email address" autocomplete="email">
+                    <input type="email" id="login-email" placeholder="Email" value="user1@test.com">
                 </div>
                 <div class="form-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-                    <button type="button" class="show-password" id="show-login-password">
-                        <i class="fas fa-eye"></i>
-                    </button>
+                    <input type="password" id="login-password" placeholder="Password" value="123456">
                 </div>
-                <button id="login-btn" class="btn btn-primary btn-block">
+                <button id="login-btn" class="btn btn-primary">
                     <i class="fas fa-sign-in-alt"></i> Login
                 </button>
-                <div class="divider">
-                    <span>or continue with</span>
-                </div>
-                <button id="google-login-btn" class="btn btn-google btn-block">
-                    <i class="fab fa-google"></i> Google
+                <div class="divider">or</div>
+                <button id="google-login-btn" class="btn btn-google">
+                    <i class="fab fa-google"></i> Login with Google
                 </button>
-                <div class="auth-footer">
-                    <a href="#" class="forgot-password">Forgot password?</a>
-                </div>
             </div>
             
             <div class="auth-form" id="signup-form">
                 <div class="form-group">
-                    <i class="fas fa-user"></i>
-                    <input type="text" id="signup-name" placeholder="Full name" autocomplete="name">
+                    <input type="text" id="signup-name" placeholder="Your Name" value="User One">
                 </div>
                 <div class="form-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" id="signup-email" placeholder="Email address" autocomplete="email">
+                    <input type="email" id="signup-email" placeholder="Email" value="user2@test.com">
                 </div>
                 <div class="form-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="signup-password" placeholder="Password" autocomplete="new-password">
-                    <button type="button" class="show-password" id="show-signup-password">
-                        <i class="fas fa-eye"></i>
-                    </button>
+                    <input type="password" id="signup-password" placeholder="Password" value="123456">
                 </div>
-                <div class="form-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="signup-confirm-password" placeholder="Confirm password" autocomplete="new-password">
-                </div>
-                <button id="signup-btn" class="btn btn-primary btn-block">
-                    <i class="fas fa-user-plus"></i> Create Account
+                <button id="signup-btn" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Sign Up
                 </button>
-                <div class="terms">
-                    By signing up, you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>
-                </div>
             </div>
             
-            <div class="install-prompt" id="install-prompt">
-                <p>Install for better experience</p>
-                <button id="install-btn" class="btn-install">
-                    <i class="fas fa-download"></i> Install App
-                </button>
+            <div class="connection-status">
+                <div id="connection-dot"></div>
+                <span id="connection-text">Connecting...</span>
             </div>
         </div>
     </div>
 
     <!-- Chat Screen -->
-    <div id="chat-screen" class="screen">
-        <!-- Mobile Header -->
-        <div class="mobile-header">
-            <button class="menu-toggle" id="menu-toggle">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="mobile-chat-info">
-                <h2 id="mobile-chat-title">Global Chat</h2>
-                <div id="mobile-chat-info">Online: 0</div>
-            </div>
-            <button class="user-menu-toggle" id="user-menu-toggle">
-                <i class="fas fa-ellipsis-v"></i>
-            </button>
-        </div>
-
+    <div id="chat-screen" style="display: none;">
         <!-- Sidebar -->
-        <div class="sidebar" id="sidebar">
-            <!-- User Profile -->
-            <div class="user-profile">
-                <div class="profile-header">
-                    <div class="avatar-large" id="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="profile-info">
-                        <h3 id="user-name">Loading...</h3>
-                        <div class="user-status">
-                            <span class="status-dot online"></span>
-                            <span id="user-status-text">Online</span>
-                        </div>
-                    </div>
-                    <button class="close-sidebar" id="close-sidebar">
-                        <i class="fas fa-times"></i>
-                    </button>
+        <div class="sidebar">
+            <!-- User Info -->
+            <div class="user-info">
+                <div class="avatar" id="user-avatar">U</div>
+                <div class="user-details">
+                    <h3 id="user-name">User</h3>
+                    <div class="user-status" id="user-status">Online</div>
                 </div>
-                
-                <div class="profile-stats">
-                    <div class="stat">
-                        <i class="fas fa-comments"></i>
-                        <span id="message-count">0</span>
-                        <small>Messages</small>
-                    </div>
-                    <div class="stat">
-                        <i class="fas fa-user-friends"></i>
-                        <span id="contact-count">0</span>
-                        <small>Contacts</small>
-                    </div>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+
+            <!-- Chat Type Selector -->
+            <div class="chat-type-selector">
+                <button id="global-chat-btn" class="chat-type-btn active">
+                    <i class="fas fa-globe"></i> Global
+                </button>
+                <button id="private-chat-btn" class="chat-type-btn">
+                    <i class="fas fa-user"></i> Private
+                </button>
+                <button id="group-chat-btn" class="chat-type-btn">
+                    <i class="fas fa-users"></i> Groups
+                </button>
+            </div>
+
+            <!-- Online Users -->
+            <div class="section" id="online-users-section">
+                <h4><i class="fas fa-circle online"></i> Online Users</h4>
+                <div class="users-list" id="online-users-list">
+                    <div class="loading">Loading users...</div>
                 </div>
             </div>
 
-            <!-- Navigation -->
-            <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" data-view="chats">
-                    <i class="fas fa-comments"></i>
-                    <span>Chats</span>
-                </a>
-                <a href="#" class="nav-item" data-view="contacts">
-                    <i class="fas fa-users"></i>
-                    <span>Contacts</span>
-                </a>
-                <a href="#" class="nav-item" data-view="groups">
-                    <i class="fas fa-layer-group"></i>
-                    <span>Groups</span>
-                </a>
-                <a href="#" class="nav-item" data-view="media">
-                    <i class="fas fa-images"></i>
-                    <span>Media</span>
-                </a>
-            </nav>
-
-            <!-- Chats List -->
-            <div class="sidebar-section active" id="chats-section">
+            <!-- Groups -->
+            <div class="section" id="groups-section">
                 <div class="section-header">
-                    <h3>Recent Chats</h3>
-                    <button class="new-chat-btn" id="new-chat-btn">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-                <div class="chats-list" id="chats-list">
-                    <!-- Chats will be loaded here -->
-                </div>
-            </div>
-
-            <!-- Contacts List -->
-            <div class="sidebar-section" id="contacts-section">
-                <div class="section-header">
-                    <h3>Contacts</h3>
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="contact-search" placeholder="Search contacts...">
-                    </div>
-                </div>
-                <div class="contacts-list" id="contacts-list">
-                    <!-- Contacts will be loaded here -->
-                </div>
-            </div>
-
-            <!-- Groups List -->
-            <div class="sidebar-section" id="groups-section">
-                <div class="section-header">
-                    <h3>Groups</h3>
-                    <button class="create-group-btn" id="create-group-sidebar-btn">
-                        <i class="fas fa-plus"></i> New Group
+                    <h4><i class="fas fa-layer-group"></i> Your Groups</h4>
+                    <button id="create-group-btn" class="btn-small">
+                        <i class="fas fa-plus"></i> New
                     </button>
                 </div>
                 <div class="groups-list" id="groups-list">
-                    <!-- Groups will be loaded here -->
+                    <div class="group-item active" data-group-id="global">
+                        <i class="fas fa-globe"></i>
+                        <span>Global Chat</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Media Gallery -->
-            <div class="sidebar-section" id="media-section">
-                <div class="section-header">
-                    <h3>Shared Media</h3>
+            <!-- Create Group Section -->
+            <div class="section" id="create-group-section" style="display: none;">
+                <h4><i class="fas fa-plus-circle"></i> Create Group</h4>
+                <div class="form-group">
+                    <input type="text" id="new-group-name" placeholder="Group name">
                 </div>
-                <div class="media-grid" id="media-grid">
-                    <!-- Media items will be loaded here -->
+                <div class="selected-members" id="selected-members">
+                    <div class="selected-members-title">Selected: <span id="selected-count">0</span></div>
+                    <div class="selected-list" id="selected-list"></div>
                 </div>
-            </div>
-
-            <!-- Logout Button -->
-            <div class="sidebar-footer">
-                <button id="logout-btn" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i> Logout
+                <button id="create-group-submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-check"></i> Create Group
                 </button>
-                <div class="app-info">
-                    <small>Modern Chat v1.0</small>
-                </div>
+                <button id="cancel-group-btn" class="btn btn-secondary btn-block">
+                    Cancel
+                </button>
             </div>
         </div>
 
@@ -244,27 +137,24 @@
         <div class="main-chat">
             <!-- Chat Header -->
             <div class="chat-header">
-                <div class="chat-partner-info">
-                    <div class="partner-avatar" id="partner-avatar">
+                <div class="chat-info">
+                    <div class="chat-avatar" id="chat-avatar">
                         <i class="fas fa-users"></i>
                     </div>
-                    <div class="partner-details">
+                    <div>
                         <h2 id="chat-title">Global Chat</h2>
-                        <div id="chat-info">
+                        <div id="chat-status">
                             <span id="online-count">0 online</span>
-                            <span class="typing-indicator" id="typing-indicator"></span>
+                            <span class="typing" id="typing-indicator"></span>
                         </div>
                     </div>
                 </div>
                 <div class="chat-actions">
-                    <button class="chat-action-btn" id="call-btn" title="Voice call">
-                        <i class="fas fa-phone"></i>
+                    <button id="attach-btn" class="action-btn" title="Attach file">
+                        <i class="fas fa-paperclip"></i>
                     </button>
-                    <button class="chat-action-btn" id="video-btn" title="Video call">
-                        <i class="fas fa-video"></i>
-                    </button>
-                    <button class="chat-action-btn" id="info-btn" title="Chat info">
-                        <i class="fas fa-info-circle"></i>
+                    <button id="audio-btn" class="action-btn" title="Record audio">
+                        <i class="fas fa-microphone"></i>
                     </button>
                 </div>
             </div>
@@ -272,274 +162,97 @@
             <!-- Messages Container -->
             <div class="messages-container" id="messages-container">
                 <div class="messages" id="messages">
-                    <!-- Messages will be loaded here -->
+                    <!-- Messages load here -->
                 </div>
                 
                 <!-- New Messages Indicator -->
-                <div class="new-messages-indicator" id="new-messages-indicator">
+                <div class="new-messages" id="new-messages-indicator" style="display: none;">
                     <span>New messages</span>
                     <i class="fas fa-chevron-down"></i>
                 </div>
             </div>
 
-            <!-- Message Input Area -->
+            <!-- Message Input -->
             <div class="message-input-area">
                 <!-- Attachment Menu -->
-                <div class="attachment-menu" id="attachment-menu">
-                    <button class="attachment-option" data-type="image">
-                        <i class="fas fa-image"></i>
-                        <span>Photo</span>
-                    </button>
-                    <button class="attachment-option" data-type="video">
-                        <i class="fas fa-video"></i>
-                        <span>Video</span>
-                    </button>
-                    <button class="attachment-option" data-type="audio">
-                        <i class="fas fa-microphone"></i>
-                        <span>Audio</span>
-                    </button>
-                    <button class="attachment-option" data-type="document">
-                        <i class="fas fa-file"></i>
-                        <span>Document</span>
-                    </button>
-                    <button class="attachment-option" data-type="camera">
-                        <i class="fas fa-camera"></i>
-                        <span>Camera</span>
-                    </button>
+                <div class="attachment-menu" id="attachment-menu" style="display: none;">
+                    <div class="attachment-options">
+                        <button class="attachment-option" data-type="image">
+                            <i class="fas fa-image"></i>
+                            <span>Photo</span>
+                        </button>
+                        <button class="attachment-option" data-type="audio">
+                            <i class="fas fa-microphone"></i>
+                            <span>Audio</span>
+                        </button>
+                        <button class="attachment-option" data-type="file">
+                            <i class="fas fa-file"></i>
+                            <span>File</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Audio Recorder -->
-                <div class="audio-recorder" id="audio-recorder">
+                <div class="audio-recorder" id="audio-recorder" style="display: none;">
                     <div class="recorder-header">
-                        <span>Recording audio...</span>
-                        <button class="cancel-recording" id="cancel-recording">
+                        <span>Recording...</span>
+                        <button id="cancel-recording">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     <div class="recorder-visualizer">
-                        <div class="visualizer-bar"></div>
-                        <div class="visualizer-bar"></div>
-                        <div class="visualizer-bar"></div>
-                        <div class="visualizer-bar"></div>
-                        <div class="visualizer-bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
                     </div>
-                    <div class="recorder-timer">
-                        <span id="recording-timer">00:00</span>
-                    </div>
-                    <button class="stop-recording" id="stop-recording">
-                        <i class="fas fa-stop-circle"></i>
+                    <div class="recorder-timer">00:00</div>
+                    <button id="stop-recording" class="btn-stop">
+                        <i class="fas fa-stop"></i>
                     </button>
                 </div>
 
                 <!-- Main Input -->
-                <button class="attachment-toggle" id="attachment-toggle">
-                    <i class="fas fa-plus"></i>
-                </button>
-                
-                <div class="message-input-wrapper">
+                <div class="input-wrapper">
                     <input type="text" 
                            id="message-input" 
-                           placeholder="Type a message..." 
-                           autocomplete="off"
-                           autocapitalize="sentences">
-                    <button class="emoji-toggle" id="emoji-toggle">
-                        <i class="far fa-smile"></i>
-                    </button>
-                </div>
-                
-                <button class="send-btn" id="send-btn">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-                
-                <button class="voice-toggle" id="voice-toggle">
-                    <i class="fas fa-microphone"></i>
-                </button>
-            </div>
-
-            <!-- Emoji Picker -->
-            <div class="emoji-picker" id="emoji-picker">
-                <div class="emoji-categories">
-                    <button class="emoji-category active" data-category="smileys">😀</button>
-                    <button class="emoji-category" data-category="people">👋</button>
-                    <button class="emoji-category" data-category="nature">🐶</button>
-                    <button class="emoji-category" data-category="food">🍕</button>
-                    <button class="emoji-category" data-category="activities">⚽</button>
-                    <button class="emoji-category" data-category="objects">💡</button>
-                    <button class="emoji-category" data-category="symbols">❤️</button>
-                    <button class="emoji-category" data-category="flags">🏳️</button>
-                </div>
-                <div class="emoji-grid" id="emoji-grid">
-                    <!-- Emojis will be loaded here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- User Menu (Mobile) -->
-        <div class="user-menu" id="user-menu">
-            <div class="menu-header">
-                <h3>Menu</h3>
-                <button class="close-menu" id="close-user-menu">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="menu-items">
-                <a href="#" class="menu-item" data-action="profile">
-                    <i class="fas fa-user"></i>
-                    <span>My Profile</span>
-                </a>
-                <a href="#" class="menu-item" data-action="settings">
-                    <i class="fas fa-cog"></i>
-                    <span>Settings</span>
-                </a>
-                <a href="#" class="menu-item" data-action="notifications">
-                    <i class="fas fa-bell"></i>
-                    <span>Notifications</span>
-                </a>
-                <a href="#" class="menu-item" data-action="theme">
-                    <i class="fas fa-palette"></i>
-                    <span>Theme</span>
-                </a>
-                <a href="#" class="menu-item" data-action="help">
-                    <i class="fas fa-question-circle"></i>
-                    <span>Help</span>
-                </a>
-                <a href="#" class="menu-item" data-action="logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Overlay -->
-        <div class="overlay" id="overlay"></div>
-    </div>
-
-    <!-- Modals -->
-    <div class="modal" id="new-chat-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>New Chat</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="new-chat-search" placeholder="Search users...">
-                </div>
-                <div class="users-list" id="new-chat-users">
-                    <!-- Users will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="create-group-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create New Group</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="group-name">Group Name</label>
-                    <input type="text" id="group-name" placeholder="Enter group name">
-                </div>
-                <div class="form-group">
-                    <label for="group-description">Description (Optional)</label>
-                    <textarea id="group-description" placeholder="Group description"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Select Members</label>
-                    <div class="members-selection">
-                        <div class="selected-members" id="selected-members">
-                            <!-- Selected members will appear here -->
-                        </div>
-                        <div class="available-members" id="available-members">
-                            <!-- Available members will be loaded here -->
-                        </div>
+                           placeholder="Type your message..." 
+                           autocomplete="off">
+                    <div class="input-actions">
+                        <button id="emoji-btn" class="emoji-btn">
+                            <i class="far fa-smile"></i>
+                        </button>
                     </div>
                 </div>
-                <button id="create-group-submit" class="btn btn-primary btn-block">
-                    <i class="fas fa-plus-circle"></i> Create Group
+                <button id="send-btn" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
         </div>
     </div>
 
-    <div class="modal" id="image-preview-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Preview Image</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <img id="preview-image" src="" alt="Preview">
-                <div class="preview-actions">
-                    <button id="send-image" class="btn btn-primary">
-                        <i class="fas fa-paper-plane"></i> Send
-                    </button>
-                    <button id="cancel-image" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                </div>
-            </div>
+    <!-- File Input (Hidden) -->
+    <input type="file" id="file-input" style="display: none;" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt">
+    
+    <!-- Audio Element (Hidden) -->
+    <audio id="audio-player" style="display: none;"></audio>
+
+    <!-- Debug Console -->
+    <div class="debug-console" id="debug-console">
+        <div class="debug-header">
+            <span>Debug Console</span>
+            <button id="toggle-debug">
+                <i class="fas fa-chevron-up"></i>
+            </button>
+        </div>
+        <div class="debug-content" id="debug-content">
+            <div class="debug-item">App initialized</div>
         </div>
     </div>
 
-    <!-- File Upload Progress -->
-    <div class="upload-progress" id="upload-progress">
-        <div class="progress-header">
-            <span>Uploading...</span>
-            <span id="upload-percentage">0%</span>
-        </div>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <div class="file-info">
-            <span id="file-name"></span>
-            <span id="file-size"></span>
-        </div>
-    </div>
-
-    <!-- Notifications -->
-    <div class="notification-container" id="notification-container">
-        <!-- Notifications will appear here -->
-    </div>
-
-    <!-- JavaScript Files -->
+    <!-- JavaScript -->
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
-    
-    <!-- Register Service Worker for PWA -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(registration => {
-                    console.log('Service Worker registered:', registration);
-                })
-                .catch(error => {
-                    console.log('Service Worker registration failed:', error);
-                });
-        }
-        
-        // Handle install prompt
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.getElementById('install-prompt').style.display = 'block';
-        });
-        
-        document.getElementById('install-btn').addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    document.getElementById('install-prompt').style.display = 'none';
-                }
-                deferredPrompt = null;
-            }
-        });
-    </script>
 </body>
 </html>
