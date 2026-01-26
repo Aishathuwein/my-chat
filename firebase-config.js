@@ -2,9 +2,8 @@
 // FIREBASE CONFIGURATION
 // ============================================
 
-// IMPORTANT: REPLACE THESE VALUES WITH YOUR OWN FROM FIREBASE
+// IMPORTANT: Replace with your Firebase config
 const firebaseConfig = {
-   
   apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
   authDomain: "my-chat-app-e1a85.firebaseapp.com",
   databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
@@ -15,24 +14,32 @@ const firebaseConfig = {
 
 };
 
-console.log("🔥 Initializing Firebase...");
+console.log("🚀 Initializing Firebase...");
 
 // Initialize Firebase
 try {
     firebase.initializeApp(firebaseConfig);
     console.log("✅ Firebase initialized successfully");
+    
+    // Show notification
+    showNotification("Firebase Connected", "success");
+    
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    alert("Firebase failed to initialize. Please check your configuration.");
+    showNotification("Firebase connection failed", "error");
 }
 
 // Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 // Enable offline persistence
 db.enablePersistence()
-    .then(() => console.log("📦 Offline persistence enabled"))
+    .then(() => {
+        console.log("📦 Offline persistence enabled");
+        showNotification("Offline mode enabled", "info");
+    })
     .catch((err) => {
         console.log("📦 Persistence failed:", err);
         if (err.code === 'failed-precondition') {
@@ -42,9 +49,20 @@ db.enablePersistence()
         }
     });
 
-console.log("✅ Firebase services initialized");
+// Helper function for notifications (defined here to use early)
+function showNotification(title, type = "info", message = "") {
+    if (typeof window.showAppNotification === 'function') {
+        window.showAppNotification(title, type, message);
+    } else {
+        console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+    }
+}
 
 // Export for use in other files
 window.auth = auth;
 window.db = db;
+window.storage = storage;
 window.firebase = firebase;
+window.showFirebaseNotification = showNotification;
+
+console.log("✅ Firebase services initialized");

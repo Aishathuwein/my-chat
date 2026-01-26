@@ -1,21 +1,51 @@
 {
-  "name": "Secure Chat App",
-  "short_name": "ChatApp",
-  "description": "Secure end-to-end encrypted chat application",
+  "name": "Modern Chat",
+  "short_name": "Chat",
+  "description": "Modern chat application with audio messages and file sharing",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a1a",
-  "theme_color": "#007aff",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=Chat&background=007aff&color=fff&size=192",
+      "src": "https://ui-avatars.com/api/?name=Chat&background=667eea&color=fff&size=192",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=Chat&background=007aff&color=fff&size=512",
+      "src": "https://ui-avatars.com/api/?name=Chat&background=667eea&color=fff&size=512",
       "sizes": "512x512",
       "type": "image/png"
+    }
+  ],
+  "categories": ["social", "communication"],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new chat",
+      "url": "/?new-chat"
+    },
+    {
+      "name": "Global Chat",
+      "short_name": "Global",
+      "description": "Join global chat",
+      "url": "/?global"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://via.placeholder.com/1280x720/667eea/ffffff?text=Modern+Chat",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "https://via.placeholder.com/720x1280/667eea/ffffff?text=Modern+Chat",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }
