@@ -1,20 +1,18 @@
 // ============================================
-// FIREBASE CONFIGURATION FOR ZU CHAT
+// FIREBASE CONFIGURATION - UNIVERSITY CHAT
 // ============================================
 
-// Replace with your Firebase project configuration
+// 🔥 REPLACE THESE VALUES WITH YOUR FIREBASE CONFIG
 const firebaseConfig = {
-     apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
-  authDomain: "my-chat-app-e1a85.firebaseapp.com",
-  databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
-  projectId: "my-chat-app-e1a85",
-  storageBucket: "my-chat-app-e1a85.firebasestorage.app",
-  messagingSenderId: "1018726193704",
-  appId: "1:1018726193704:web:58ff7905d107248e86331d"
-
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
-console.log("🚀 Initializing Firebase for ZU Chat...");
+console.log("🚀 Initializing Firebase...");
 
 // Initialize Firebase
 try {
@@ -22,14 +20,13 @@ try {
     console.log("✅ Firebase initialized successfully");
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    alert("Firebase connection failed. Please refresh the page.");
+    alert("Firebase failed to initialize. Please check your internet connection.");
 }
 
-// Initialize Firebase services
+// Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
-const messaging = firebase.messaging();
 
 // Enable offline persistence
 db.enablePersistence()
@@ -37,117 +34,18 @@ db.enablePersistence()
         console.log("📦 Offline persistence enabled");
     })
     .catch((err) => {
-        console.log("📦 Persistence failed:", err.code);
+        console.log("📦 Persistence failed:", err);
         if (err.code === 'failed-precondition') {
-            console.log("Multiple tabs open. Persistence enabled only in one tab.");
+            console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
         } else if (err.code === 'unimplemented') {
-            console.log("Browser doesn't support persistence.");
+            console.log("The current browser doesn't support persistence.");
         }
     });
 
-// Request notification permission
-function requestNotificationPermission() {
-    if (!('Notification' in window)) {
-        console.log('This browser does not support notifications');
-        return;
-    }
-    
-    Notification.requestPermission().then((permission) => {
-        if (permission === 'granted') {
-            console.log('Notification permission granted');
-            // Get FCM token
-            messaging.getToken().then((token) => {
-                console.log('FCM Token:', token);
-                // Save token to user's document
-                if (window.currentUser) {
-                    db.collection('users').doc(window.currentUser.uid).update({
-                        fcmToken: token,
-                        notificationEnabled: true
-                    });
-                }
-            });
-        }
-    });
-}
-
-// Handle incoming messages
-messaging.onMessage((payload) => {
-    console.log('Message received:', payload);
-    
-    // Show notification
-    if (Notification.permission === 'granted') {
-        const notification = new Notification(payload.notification.title, {
-            body: payload.notification.body,
-            icon: 'https://via.placeholder.com/64/0056A4/ffffff?text=ZU',
-            badge: 'https://via.placeholder.com/64/0056A4/ffffff?text=ZU'
-        });
-        
-        notification.onclick = function(event) {
-            event.preventDefault();
-            window.focus();
-            notification.close();
-        };
-    }
-});
-
-// Firebase Cloud Messaging setup
-function setupFCM() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js')
-            .then((registration) => {
-                messaging.useServiceWorker(registration);
-                console.log('Service Worker registered for FCM');
-            })
-            .catch((err) => {
-                console.log('Service Worker registration failed:', err);
-            });
-    }
-}
-
-// Initialize FCM after user login
-function initFCMForUser(userId) {
-    if (userId && 'Notification' in window) {
-        requestNotificationPermission();
-        setupFCM();
-    }
-}
-
-// Export services for global access
+// Export for global access
 window.auth = auth;
 window.db = db;
 window.storage = storage;
-window.messaging = messaging;
 window.firebase = firebase;
-window.initFCMForUser = initFCMForUser;
-window.requestNotificationPermission = requestNotificationPermission;
-
-// Helper function to show Firebase errors
-window.showFirebaseError = function(error) {
-    console.error('Firebase Error:', error);
-    
-    let message = 'An error occurred';
-    if (error.code) {
-        switch (error.code) {
-            case 'permission-denied':
-                message = 'Permission denied. Please check your security rules.';
-                break;
-            case 'unavailable':
-                message = 'Service unavailable. Please check your internet connection.';
-                break;
-            case 'not-found':
-                message = 'Document not found. It may have been deleted.';
-                break;
-            default:
-                message = error.message || 'Unknown error occurred';
-        }
-    }
-    
-    if (window.showNotification) {
-        window.showNotification('Error', 'error', message);
-    } else {
-        alert(message);
-    }
-};
-
 
 console.log("✅ Firebase services ready");
