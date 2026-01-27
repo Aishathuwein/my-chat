@@ -1,23 +1,37 @@
 {
-  "name": "University Chat",
-  "short_name": "UZ Chat",
-  "description": "University Communication Platform",
+  "name": "Zanzibar University Chat",
+  "short_name": "ZU Chat",
+  "description": "Secure chat application for Zanzibar University",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0066cc",
-  "theme_color": "#0066cc",
+  "background_color": "#0a3d62",
+  "theme_color": "#0a3d62",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=UZ&background=0066cc&color=fff&size=192",
+      "src": "https://via.placeholder.com/192/0a3d62/ffffff?text=ZU",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=UZ&background=0066cc&color=fff&size=512",
+      "src": "https://via.placeholder.com/512/0a3d62/ffffff?text=ZU",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "categories": ["education", "communication"]
+  "categories": ["education", "social"],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new chat",
+      "url": "/?new-chat"
+    },
+    {
+      "name": "Groups",
+      "short_name": "Groups",
+      "description": "View groups",
+      "url": "/?groups"
+    }
+  ]
 }
