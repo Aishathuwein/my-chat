@@ -1,45 +1,37 @@
 {
-  "name": "University Chat",
-  "short_name": "UniChat",
+  "name": "ZU Chat",
+  "short_name": "ZU Chat",
   "description": "Zanzibar University Chat Application",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a237e",
-  "theme_color": "#1a237e",
+  "background_color": "#0056A4",
+  "theme_color": "#0056A4",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=ZU&background=1a237e&color=ffd700&size=192",
+      "src": "https://via.placeholder.com/192/0056A4/ffffff?text=ZU",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=ZU&background=1a237e&color=ffd700&size=512",
+      "src": "https://via.placeholder.com/512/0056A4/ffffff?text=ZU",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "categories": ["social", "communication", "education"],
+  "categories": ["education", "social", "communication"],
   "shortcuts": [
     {
       "name": "Global Chat",
       "short_name": "Global",
-      "description": "Join global university chat",
+      "description": "Join university global chat",
       "url": "/?global"
     },
     {
       "name": "New Chat",
       "short_name": "Chat",
       "description": "Start a new conversation",
-      "url": "/?new"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "https://via.placeholder.com/1280x720/1a237e/ffd700?text=University+Chat",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
+      "url": "/?new-chat"
     }
   ]
 }
