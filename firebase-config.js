@@ -50,5 +50,4 @@ window.db = db;
 window.storage = storage;
 window.firebase = firebase;
 
-
 console.log("✅ Firebase services ready");
