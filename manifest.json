@@ -1,51 +1,45 @@
 {
-  "name": "Modern Chat",
-  "short_name": "Chat",
-  "description": "Modern chat application with audio messages and file sharing",
+  "name": "University Chat",
+  "short_name": "UniChat",
+  "description": "Zanzibar University Chat Application",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#667eea",
-  "theme_color": "#667eea",
+  "background_color": "#1a237e",
+  "theme_color": "#1a237e",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=Chat&background=667eea&color=fff&size=192",
+      "src": "https://ui-avatars.com/api/?name=ZU&background=1a237e&color=ffd700&size=192",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=Chat&background=667eea&color=fff&size=512",
+      "src": "https://ui-avatars.com/api/?name=ZU&background=1a237e&color=ffd700&size=512",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "categories": ["social", "communication"],
+  "categories": ["social", "communication", "education"],
   "shortcuts": [
-    {
-      "name": "New Chat",
-      "short_name": "Chat",
-      "description": "Start a new chat",
-      "url": "/?new-chat"
-    },
     {
       "name": "Global Chat",
       "short_name": "Global",
-      "description": "Join global chat",
+      "description": "Join global university chat",
       "url": "/?global"
+    },
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new conversation",
+      "url": "/?new"
     }
   ],
   "screenshots": [
     {
-      "src": "https://via.placeholder.com/1280x720/667eea/ffffff?text=Modern+Chat",
+      "src": "https://via.placeholder.com/1280x720/1a237e/ffd700?text=University+Chat",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide"
-    },
-    {
-      "src": "https://via.placeholder.com/720x1280/667eea/ffffff?text=Modern+Chat",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow"
     }
   ]
 }

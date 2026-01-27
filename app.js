@@ -1,8 +1,8 @@
 // ============================================
-// MODERN CHAT APPLICATION - FIXED VERSION
+// UNIVERSITY CHAT APPLICATION
 // ============================================
 
-console.log("🚀 Modern Chat App starting...");
+console.log("🎓 University Chat - Starting application...");
 
 // Global variables
 let currentUser = null;
@@ -15,71 +15,97 @@ let currentChat = {
 let onlineUsers = new Map();
 let contacts = new Map();
 let groups = new Map();
-let mediaCache = new Map();
+let selectedUsers = new Set();
 let messageListeners = new Map();
 let audioRecorder = null;
+let mediaRecorder = null;
 let recordingTimer = null;
 let recordingStartTime = null;
-let selectedMediaFile = null;
-let selectedUsersForGroup = new Set();
+let selectedFile = null;
+let typingTimeout = null;
+let isTyping = false;
 
 // DOM Elements
 const elements = {
+    // Screens
     splashScreen: document.getElementById('splash-screen'),
     authScreen: document.getElementById('auth-screen'),
     chatScreen: document.getElementById('chat-screen'),
     
-    // Auth elements
+    // Auth
     loginForm: document.getElementById('login-form'),
     signupForm: document.getElementById('signup-form'),
     loginEmail: document.getElementById('login-email'),
     loginPassword: document.getElementById('login-password'),
     signupName: document.getElementById('signup-name'),
     signupEmail: document.getElementById('signup-email'),
+    signupRole: document.getElementById('signup-role'),
     signupPassword: document.getElementById('signup-password'),
     signupConfirmPassword: document.getElementById('signup-confirm-password'),
     loginBtn: document.getElementById('login-btn'),
     signupBtn: document.getElementById('signup-btn'),
     googleLoginBtn: document.getElementById('google-login-btn'),
     
-    // Chat elements
+    // Chat UI
     sidebar: document.getElementById('sidebar'),
-    messagesContainer: document.getElementById('messages-container'),
     messages: document.getElementById('messages'),
     messageInput: document.getElementById('message-input'),
     sendBtn: document.getElementById('send-btn'),
     attachmentToggle: document.getElementById('attachment-toggle'),
     attachmentMenu: document.getElementById('attachment-menu'),
     audioRecorderElement: document.getElementById('audio-recorder'),
-    voiceToggle: document.getElementById('voice-toggle'),
+    recordBtn: document.getElementById('record-btn'),
+    emojiBtn: document.getElementById('emoji-btn'),
+    emojiPicker: document.getElementById('emoji-picker'),
     
-    // User interface
+    // User info
     userName: document.getElementById('user-name'),
     userAvatar: document.getElementById('user-avatar'),
+    userStatusText: document.getElementById('user-status-text'),
+    statusDot: document.getElementById('status-dot'),
+    userRole: document.getElementById('user-role'),
+    
+    // Chat info
     chatTitle: document.getElementById('chat-title'),
     chatInfo: document.getElementById('chat-info'),
     mobileChatTitle: document.getElementById('mobile-chat-title'),
     mobileChatInfo: document.getElementById('mobile-chat-info'),
     onlineCount: document.getElementById('online-count'),
+    typingIndicator: document.getElementById('typing-indicator'),
     
     // Lists
     chatsList: document.getElementById('chats-list'),
     contactsList: document.getElementById('contacts-list'),
     groupsList: document.getElementById('groups-list'),
+    mediaGrid: document.getElementById('media-grid'),
     
     // Modals
+    newChatModal: document.getElementById('new-chat-modal'),
     createGroupModal: document.getElementById('create-group-modal'),
+    groupInfoModal: document.getElementById('group-info-modal'),
+    imagePreviewModal: document.getElementById('image-preview-modal'),
+    messageActionsModal: document.getElementById('message-actions-modal'),
     
     // Buttons
     logoutBtn: document.getElementById('logout-btn'),
     menuToggle: document.getElementById('menu-toggle'),
     closeSidebar: document.getElementById('close-sidebar'),
+    userMenuToggle: document.getElementById('user-menu-toggle'),
+    closeMenu: document.getElementById('close-menu'),
     newChatBtn: document.getElementById('new-chat-btn'),
-    createGroupSidebarBtn: document.getElementById('create-group-sidebar-btn'),
-    createGroupSubmit: document.getElementById('create-group-submit'),
+    newGroupBtn: document.getElementById('new-group-btn'),
+    createGroupModalBtn: document.getElementById('create-group-modal-btn'),
     
     // Other
-    overlay: document.getElementById('overlay')
+    overlay: document.getElementById('overlay'),
+    userMenu: document.getElementById('user-menu'),
+    uploadProgress: document.getElementById('upload-progress'),
+    progressFill: document.getElementById('progress-fill'),
+    uploadPercent: document.getElementById('upload-percent'),
+    uploadFilename: document.getElementById('upload-filename'),
+    uploadSpeed: document.getElementById('upload-speed'),
+    cancelUpload: document.getElementById('cancel-upload'),
+    notificationsContainer: document.getElementById('notifications-container')
 };
 
 // ============================================
@@ -95,20 +121,46 @@ document.addEventListener('DOMContentLoaded', function() {
         checkAuthState();
     }, 2000);
     
-    // Setup all event listeners
+    // Setup event listeners
     setupEventListeners();
+    
+    // Check for saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('theme-toggle').checked = true;
+    }
     
     console.log("✅ App initialization complete");
 });
 
+// ============================================
+// EVENT LISTENERS
+// ============================================
+
 function setupEventListeners() {
     console.log("🔗 Setting up event listeners...");
     
-    // Auth form toggles
+    // Auth tabs
     document.querySelectorAll('.auth-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
+        tab.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
             switchAuthTab(tabName);
+        });
+    });
+    
+    // Show password buttons
+    document.querySelectorAll('.show-password').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const input = this.parentElement.querySelector('input');
+            const icon = this.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
         });
     });
     
@@ -118,25 +170,32 @@ function setupEventListeners() {
     elements.googleLoginBtn.addEventListener('click', handleGoogleLogin);
     elements.logoutBtn.addEventListener('click', handleLogout);
     
-    // Enter key for auth forms
+    // Enter key for auth
     [elements.loginEmail, elements.loginPassword].forEach(input => {
         input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleLogin();
         });
     });
     
+    [elements.signupName, elements.signupEmail, elements.signupPassword, elements.signupConfirmPassword].forEach(input => {
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSignup();
+        });
+    });
+    
     // Navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const view = this.dataset.view;
-            switchSidebarView(view);
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const section = this.dataset.section;
+            switchSidebarSection(section);
         });
     });
     
     // Mobile menu
     elements.menuToggle.addEventListener('click', toggleSidebar);
     elements.closeSidebar.addEventListener('click', toggleSidebar);
+    elements.userMenuToggle.addEventListener('click', toggleUserMenu);
+    elements.closeMenu.addEventListener('click', toggleUserMenu);
     elements.overlay.addEventListener('click', closeAllMenus);
     
     // Message input
@@ -150,45 +209,87 @@ function setupEventListeners() {
     
     elements.sendBtn.addEventListener('click', sendMessage);
     elements.attachmentToggle.addEventListener('click', toggleAttachmentMenu);
-    elements.voiceToggle.addEventListener('click', toggleVoiceRecording);
+    elements.recordBtn.addEventListener('click', toggleAudioRecording);
+    
+    // Attachment buttons
+    document.querySelectorAll('.attachment-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const type = this.dataset.type;
+            handleAttachment(type);
+        });
+    });
     
     // Audio recorder
-    document.getElementById('cancel-recording')?.addEventListener('click', cancelRecording);
-    document.getElementById('stop-recording')?.addEventListener('click', stopRecording);
+    document.getElementById('cancel-recording').addEventListener('click', cancelRecording);
+    document.getElementById('send-recording').addEventListener('click', stopAndSendRecording);
     
-    // Modal controls
+    // Emoji picker
+    elements.emojiBtn.addEventListener('click', toggleEmojiPicker);
+    document.getElementById('close-emoji').addEventListener('click', closeEmojiPicker);
+    setupEmojiPicker();
+    
+    // Modals
     document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.closest('.modal').classList.remove('active');
+        btn.addEventListener('click', function() {
+            this.closest('.modal').classList.remove('active');
             elements.overlay.classList.remove('active');
         });
     });
     
-    // New chat
-    elements.newChatBtn.addEventListener('click', () => {
-        openNewChatModal();
-    });
-    
-    // Create group
-    elements.createGroupSidebarBtn.addEventListener('click', () => {
-        openCreateGroupModal();
-    });
-    
-    elements.createGroupSubmit.addEventListener('click', createGroup);
-    
-    // Close modals on overlay click
-    elements.overlay.addEventListener('click', () => {
+    elements.overlay.addEventListener('click', function() {
         document.querySelectorAll('.modal.active').forEach(modal => {
             modal.classList.remove('active');
         });
         elements.overlay.classList.remove('active');
     });
     
+    // New chat
+    elements.newChatBtn.addEventListener('click', openNewChatModal);
+    
+    // Create group
+    elements.newGroupBtn.addEventListener('click', openCreateGroupModal);
+    elements.createGroupModalBtn.addEventListener('click', createGroup);
+    
+    // Search
+    const searchInput = document.getElementById('search-input');
+    const searchClear = document.getElementById('search-clear');
+    
+    searchInput.addEventListener('input', function() {
+        const hasText = this.value.trim().length > 0;
+        searchClear.classList.toggle('active', hasText);
+        searchContacts(this.value);
+    });
+    
+    searchClear.addEventListener('click', function() {
+        searchInput.value = '';
+        this.classList.remove('active');
+        searchContacts('');
+    });
+    
+    // User menu actions
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const action = this.dataset.action;
+            handleUserMenuAction(action);
+        });
+    });
+    
+    // Theme toggle
+    document.getElementById('theme-toggle').addEventListener('change', function() {
+        document.body.classList.toggle('dark-mode', this.checked);
+        localStorage.setItem('theme', this.checked ? 'dark' : 'light');
+        showNotification('Theme Changed', 'success', 
+            `Switched to ${this.checked ? 'dark' : 'light'} mode`);
+    });
+    
+    // Scroll to bottom button
+    document.getElementById('scroll-bottom-btn').addEventListener('click', scrollToBottom);
+    
     console.log("✅ Event listeners setup complete");
 }
 
 // ============================================
-// AUTHENTICATION - FIXED
+// AUTHENTICATION
 // ============================================
 
 function checkAuthState() {
@@ -223,12 +324,12 @@ async function handleLogin() {
     const password = elements.loginPassword.value;
     
     if (!validateEmail(email)) {
-        showNotification('Invalid email', 'error');
+        showNotification('Invalid Email', 'error', 'Please enter a valid university email');
         return;
     }
     
     if (password.length < 6) {
-        showNotification('Password must be at least 6 characters', 'error');
+        showNotification('Invalid Password', 'error', 'Password must be at least 6 characters');
         return;
     }
     
@@ -236,113 +337,123 @@ async function handleLogin() {
         showNotification('Logging in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
         console.log("✅ Logged in:", email);
-        showNotification('Login successful!', 'success');
+        
     } catch (error) {
         console.error("❌ Login error:", error);
-        showNotification(error.message, 'error');
+        showNotification('Login Failed', 'error', error.message);
     }
 }
 
 async function handleSignup() {
     const name = elements.signupName.value.trim();
     const email = elements.signupEmail.value.trim();
+    const role = elements.signupRole.value;
     const password = elements.signupPassword.value;
     const confirmPassword = elements.signupConfirmPassword.value;
     
     if (!name) {
-        showNotification('Please enter your name', 'error');
+        showNotification('Name Required', 'error', 'Please enter your full name');
         return;
     }
     
     if (!validateEmail(email)) {
-        showNotification('Invalid email', 'error');
+        showNotification('Invalid Email', 'error', 'Please enter a valid university email');
+        return;
+    }
+    
+    if (!role) {
+        showNotification('Role Required', 'error', 'Please select your role');
         return;
     }
     
     if (password.length < 6) {
-        showNotification('Password must be at least 6 characters', 'error');
+        showNotification('Weak Password', 'error', 'Password must be at least 6 characters');
         return;
     }
     
     if (password !== confirmPassword) {
-        showNotification('Passwords do not match', 'error');
+        showNotification('Password Mismatch', 'error', 'Passwords do not match');
         return;
     }
     
     try {
-        showNotification('Creating account...', 'info');
+        showNotification('Creating Account...', 'info');
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         
-        // Update profile with name
+        // Update profile
         await userCredential.user.updateProfile({
             displayName: name,
-            photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=667eea&color=fff`
+            photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a237e&color=fff`
         });
         
-        // Create user document in Firestore
+        // Create user document
         await db.collection('users').doc(userCredential.user.uid).set({
             uid: userCredential.user.uid,
             email: email,
             displayName: name,
-            photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=667eea&color=fff`,
+            role: role,
+            photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a237e&color=fff`,
+            status: 'online',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'online'
+            university: 'Zanzibar University'
         });
         
         console.log("✅ Account created:", userCredential.user.uid);
-        showNotification('Account created successfully!', 'success');
+        showNotification('Account Created', 'success', 'Welcome to University Chat!');
         
     } catch (error) {
         console.error("❌ Signup error:", error);
-        showNotification(error.message, 'error');
+        showNotification('Signup Failed', 'error', error.message);
     }
 }
 
 async function handleGoogleLogin() {
     try {
         const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({
+            prompt: 'select_account'
+        });
         
         showNotification('Signing in with Google...', 'info');
         const result = await auth.signInWithPopup(provider);
+        const user = result.user;
         
         // Create/update user document
-        const user = result.user;
         await db.collection('users').doc(user.uid).set({
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
+            role: 'student',
+            status: 'online',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'online'
+            university: 'Zanzibar University'
         }, { merge: true });
         
         console.log("✅ Google login successful:", user.email);
-        showNotification('Signed in with Google!', 'success');
+        showNotification('Welcome!', 'success', 'Signed in with Google');
         
     } catch (error) {
         console.error("❌ Google login error:", error);
-        showNotification(error.message, 'error');
+        showNotification('Google Login Failed', 'error', error.message);
     }
 }
 
 async function handleLogout() {
     try {
-        // Update user status
         if (currentUser) {
+            // Update status
             await db.collection('users').doc(currentUser.uid).update({
                 status: 'offline',
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
         
-        // Clear all listeners
+        // Clear listeners
         messageListeners.forEach(unsubscribe => unsubscribe());
         messageListeners.clear();
-        
-        // Sign out
-        await auth.signOut();
         
         // Clear data
         currentUser = null;
@@ -350,14 +461,16 @@ async function handleLogout() {
         onlineUsers.clear();
         contacts.clear();
         groups.clear();
-        mediaCache.clear();
-        selectedUsersForGroup.clear();
+        selectedUsers.clear();
         
-        showNotification('Logged out successfully', 'success');
+        // Sign out
+        await auth.signOut();
+        
+        showNotification('Logged Out', 'success', 'You have been logged out');
         
     } catch (error) {
         console.error("❌ Logout error:", error);
-        showNotification(error.message, 'error');
+        showNotification('Logout Failed', 'error', error.message);
     }
 }
 
@@ -378,20 +491,22 @@ async function initializeUser(user) {
         avatar.style.backgroundSize = 'cover';
         avatar.innerHTML = '';
     } else {
-        avatar.innerHTML = `<i class="fas fa-user"></i>`;
-        avatar.style.background = 'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)';
+        const initial = (user.displayName || user.email).charAt(0).toUpperCase();
+        avatar.innerHTML = initial;
+    }
+    
+    // Get user role from Firestore
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+        const userData = userDoc.data();
+        elements.userRole.textContent = userData.role || 'Student';
     }
     
     // Update user document
-    await db.collection('users').doc(user.uid).set({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0],
-        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=667eea&color=fff`,
+    await db.collection('users').doc(user.uid).update({
         lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'online',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+        status: 'online'
+    });
 }
 
 function startUserPresence() {
@@ -399,7 +514,7 @@ function startUserPresence() {
     
     const userRef = db.collection('users').doc(currentUser.uid);
     
-    // Set online status
+    // Set online
     userRef.update({
         status: 'online',
         lastSeen: firebase.firestore.FieldValue.serverTimestamp()
@@ -417,16 +532,17 @@ function startUserPresence() {
         }
     };
     
-    // Event listeners for presence
     window.addEventListener('beforeunload', handleDisconnect);
-    document.addEventListener('visibilitychange', () => {
+    
+    // Handle visibility change
+    document.addEventListener('visibilitychange', async () => {
         if (document.hidden) {
-            userRef.update({
+            await userRef.update({
                 status: 'away',
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             });
         } else {
-            userRef.update({
+            await userRef.update({
                 status: 'online',
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -435,88 +551,77 @@ function startUserPresence() {
 }
 
 // ============================================
-// CHAT MANAGEMENT - FIXED
+// CHAT MANAGEMENT
 // ============================================
 
 function loadInitialData() {
     loadOnlineUsers();
     loadContacts();
     loadGroups();
-    loadRecentChats();
-    switchToGlobalChat();
+    loadChats();
+    switchToChat(currentChat);
 }
 
-async function loadOnlineUsers() {
-    try {
-        db.collection('users')
-            .where('status', 'in', ['online', 'away'])
-            .onSnapshot(snapshot => {
-                onlineUsers.clear();
-                snapshot.forEach(doc => {
-                    const user = doc.data();
-                    if (user.uid !== currentUser.uid) {
-                        onlineUsers.set(user.uid, user);
-                    }
-                });
-                updateOnlineCount();
-                updateContactsList();
+function loadOnlineUsers() {
+    db.collection('users')
+        .where('status', 'in', ['online', 'away'])
+        .onSnapshot(snapshot => {
+            onlineUsers.clear();
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                if (user.uid !== currentUser.uid) {
+                    onlineUsers.set(user.uid, user);
+                }
             });
-    } catch (error) {
-        console.error("Error loading online users:", error);
-    }
+            updateOnlineCount();
+        }, error => {
+            console.error("Error loading online users:", error);
+        });
 }
 
-async function loadContacts() {
-    try {
-        db.collection('users')
-            .where('uid', '!=', currentUser.uid)
-            .onSnapshot(snapshot => {
-                contacts.clear();
-                snapshot.forEach(doc => {
-                    const user = doc.data();
-                    contacts.set(user.uid, user);
-                });
-                updateContactsList();
+function loadContacts() {
+    db.collection('users')
+        .where('uid', '!=', currentUser.uid)
+        .onSnapshot(snapshot => {
+            contacts.clear();
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                contacts.set(user.uid, user);
             });
-    } catch (error) {
-        console.error("Error loading contacts:", error);
-    }
+            updateContactsList();
+        }, error => {
+            console.error("Error loading contacts:", error);
+        });
 }
 
-async function loadGroups() {
-    try {
-        db.collection('groups')
-            .where('members', 'array-contains', currentUser.uid)
-            .onSnapshot(snapshot => {
-                groups.clear();
-                snapshot.forEach(doc => {
-                    const group = { id: doc.id, ...doc.data() };
-                    groups.set(group.id, group);
-                });
-                updateGroupsList();
+function loadGroups() {
+    db.collection('groups')
+        .where('members', 'array-contains', currentUser.uid)
+        .onSnapshot(snapshot => {
+            groups.clear();
+            snapshot.forEach(doc => {
+                const group = { id: doc.id, ...doc.data() };
+                groups.set(group.id, group);
             });
-    } catch (error) {
-        console.error("Error loading groups:", error);
-    }
+            updateGroupsList();
+        }, error => {
+            console.error("Error loading groups:", error);
+        });
 }
 
-async function loadRecentChats() {
-    // This is a simplified version - you can expand it later
-    updateChatsList([]);
-}
-
-function switchToGlobalChat() {
-    switchToChat({
-        id: 'global',
-        type: 'group',
-        name: 'Global Chat',
-        participants: ['all']
-    });
+function loadChats() {
+    // Load chats where user is a participant
+    db.collection('chats')
+        .where('participants', 'array-contains', currentUser.uid)
+        .orderBy('lastActivity', 'desc')
+        .onSnapshot(snapshot => {
+            updateChatsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, error => {
+            console.error("Error loading chats:", error);
+        });
 }
 
 function switchToChat(chat) {
-    console.log("🔄 Switching to chat:", chat);
-    
     // Stop previous listener
     if (messageListeners.has(currentChat.id)) {
         messageListeners.get(currentChat.id)();
@@ -529,10 +634,20 @@ function switchToChat(chat) {
     elements.chatTitle.textContent = chat.name;
     elements.mobileChatTitle.textContent = chat.name;
     
+    // Update partner avatar
+    const partnerAvatar = document.getElementById('partner-avatar');
+    if (chat.type === 'group') {
+        partnerAvatar.innerHTML = '<i class="fas fa-users"></i>';
+        partnerAvatar.style.background = 'linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%)';
+    } else {
+        partnerAvatar.innerHTML = '<i class="fas fa-user"></i>';
+        partnerAvatar.style.background = 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)';
+    }
+    
     // Clear messages
     elements.messages.innerHTML = '';
     
-    // Load messages for this chat
+    // Load messages
     loadChatMessages(chat);
     
     // Close sidebar on mobile
@@ -541,161 +656,187 @@ function switchToChat(chat) {
     }
 }
 
-// FIXED: Message loading with proper chat ID generation
-async function loadChatMessages(chat) {
+function loadChatMessages(chat) {
     let query;
     
-    console.log("📨 Loading messages for chat:", chat);
-    
     if (chat.type === 'private') {
-        // FIXED: Generate consistent chat ID for private chats
         const chatId = generateChatId(currentUser.uid, chat.id);
-        console.log("Private chat ID generated:", chatId);
-        
         query = db.collection('messages')
             .where('chatId', '==', chatId)
             .orderBy('timestamp', 'asc');
     } else {
-        // For group chats
         query = db.collection('messages')
             .where('chatId', '==', chat.id)
             .orderBy('timestamp', 'asc');
     }
     
-    try {
-        const unsubscribe = query.onSnapshot(
-            snapshot => {
-                console.log("📩 New messages received:", snapshot.size);
-                
-                // Process each message
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added') {
-                        const message = change.doc.data();
-                        console.log("Message added:", message);
-                        displayMessage(message);
-                    }
-                });
-                
-                // Scroll to bottom
-                setTimeout(() => {
-                    elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-                }, 100);
-            },
-            error => {
-                console.error("❌ Error loading messages:", error);
-                showNotification('Error loading messages', 'error');
+    const unsubscribe = query.onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === 'added') {
+                const message = change.doc.data();
+                displayMessage(message);
             }
-        );
+        });
         
-        messageListeners.set(chat.id, unsubscribe);
+        // Scroll to bottom
+        setTimeout(scrollToBottom, 100);
         
-    } catch (error) {
-        console.error("❌ Error setting up message listener:", error);
-    }
+    }, error => {
+        console.error("Error loading messages:", error);
+        showNotification('Connection Error', 'error', 'Failed to load messages');
+    });
+    
+    messageListeners.set(chat.id, unsubscribe);
 }
 
-// FIXED: Message display with immediate feedback
 function displayMessage(message) {
     const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${message.senderId === currentUser.uid ? 'sent' : 'received'}`;
+    
     const isCurrentUser = message.senderId === currentUser.uid;
-    messageDiv.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
+    const timestamp = formatTime(message.timestamp);
     
-    const timestamp = message.timestamp?.toDate ? 
-        formatTime(message.timestamp.toDate()) : 
-        'Just now';
-    
-    let contentHtml = '';
+    let content = '';
     
     switch (message.type) {
         case 'text':
-            contentHtml = `
-                <div class="message-content">
-                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
-                    <div class="message-text">${message.text}</div>
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            `;
+            content = createTextMessage(message, isCurrentUser, timestamp);
             break;
             
         case 'image':
-            contentHtml = `
-                <div class="message-content">
-                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
-                    <div class="message-media">
-                        <img src="${message.fileUrl}" alt="Shared image" loading="lazy">
-                    </div>
-                    ${message.caption ? `<div class="message-text">${message.caption}</div>` : ''}
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            `;
+            content = createImageMessage(message, isCurrentUser, timestamp);
             break;
             
         case 'audio':
-            contentHtml = `
-                <div class="message-content">
-                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
-                    <div class="message-audio">
-                        <audio controls>
-                            <source src="${message.fileUrl}" type="audio/webm">
-                            Your browser does not support audio element.
-                        </audio>
-                    </div>
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            `;
+            content = createAudioMessage(message, isCurrentUser, timestamp);
             break;
             
         case 'file':
-            contentHtml = `
-                <div class="message-content">
-                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
-                    <a href="${message.fileUrl}" target="_blank" class="message-file" download="${message.fileName}">
-                        <div class="file-icon">
-                            <i class="fas fa-file"></i>
-                        </div>
-                        <div class="file-info">
-                            <div class="file-name">${message.fileName}</div>
-                            <div class="file-size">${formatFileSize(message.fileSize)}</div>
-                        </div>
-                        <button class="download-btn">
-                            <i class="fas fa-download"></i>
-                        </button>
-                    </a>
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            `;
+            content = createFileMessage(message, isCurrentUser, timestamp);
+            break;
+            
+        case 'system':
+            content = createSystemMessage(message);
             break;
             
         default:
-            contentHtml = `
-                <div class="message-content">
-                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
-                    <div class="message-text">${message.text || 'Unsupported message type'}</div>
-                    <div class="message-time">${timestamp}</div>
-                </div>
-            `;
+            content = createTextMessage(message, isCurrentUser, timestamp);
     }
     
-    messageDiv.innerHTML = contentHtml;
+    messageDiv.innerHTML = content;
     elements.messages.appendChild(messageDiv);
     
-    // Add animation
-    messageDiv.style.animation = 'slideIn 0.3s ease';
+    // Add event listeners for media
+    if (message.type === 'audio') {
+        setupAudioPlayer(messageDiv.querySelector('.audio-player'));
+    }
+}
+
+function createTextMessage(message, isCurrentUser, timestamp) {
+    return `
+        <div class="message-content-wrapper">
+            ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+            <div class="message-content">
+                <div class="message-text">${message.text}</div>
+                <div class="message-meta">
+                    <span class="message-time">${timestamp}</span>
+                    ${isCurrentUser ? '<span class="message-status">✓✓</span>' : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createImageMessage(message, isCurrentUser, timestamp) {
+    return `
+        <div class="message-content-wrapper">
+            ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+            <div class="message-content">
+                <div class="message-media">
+                    <img src="${message.fileUrl}" alt="Shared image" loading="lazy">
+                </div>
+                ${message.caption ? `<div class="message-text">${message.caption}</div>` : ''}
+                <div class="message-meta">
+                    <span class="message-time">${timestamp}</span>
+                    ${isCurrentUser ? '<span class="message-status">✓✓</span>' : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createAudioMessage(message, isCurrentUser, timestamp) {
+    return `
+        <div class="message-content-wrapper">
+            ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+            <div class="message-content">
+                <div class="message-audio">
+                    <div class="audio-player" data-audio-url="${message.fileUrl}">
+                        <button class="play-pause-btn">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <div class="audio-progress">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="audio-time">0:00 / ${formatDuration(message.duration || 0)}</div>
+                    </div>
+                </div>
+                <div class="message-meta">
+                    <span class="message-time">${timestamp}</span>
+                    ${isCurrentUser ? '<span class="message-status">✓✓</span>' : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createFileMessage(message, isCurrentUser, timestamp) {
+    const fileSize = formatFileSize(message.fileSize || 0);
+    return `
+        <div class="message-content-wrapper">
+            ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+            <div class="message-content">
+                <a href="${message.fileUrl}" target="_blank" class="message-file" download="${message.fileName}">
+                    <div class="file-icon">
+                        <i class="fas fa-file"></i>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">${message.fileName}</div>
+                        <div class="file-size">${fileSize}</div>
+                    </div>
+                    <button class="download-btn">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </a>
+                <div class="message-meta">
+                    <span class="message-time">${timestamp}</span>
+                    ${isCurrentUser ? '<span class="message-status">✓✓</span>' : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createSystemMessage(message) {
+    return `
+        <div class="message system">
+            <div class="message-content">
+                <div class="message-text">${message.text}</div>
+                <div class="message-time">${formatTime(message.timestamp)}</div>
+            </div>
+        </div>
+    `;
 }
 
 // ============================================
-// MESSAGING - FIXED
+// MESSAGING
 // ============================================
 
 async function sendMessage() {
     const text = elements.messageInput.value.trim();
-    if (!text && !selectedMediaFile) {
-        showNotification('Please enter a message', 'error');
-        return;
-    }
     
-    if (!currentUser) {
-        showNotification('You must be logged in to send messages', 'error');
+    if (!text && !selectedFile) {
+        showNotification('Empty Message', 'error', 'Please enter a message or attach a file');
         return;
     }
     
@@ -704,284 +845,200 @@ async function sendMessage() {
             senderId: currentUser.uid,
             senderName: currentUser.displayName || currentUser.email.split('@')[0],
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            chatId: currentChat.id,
             type: 'text',
             text: text
         };
         
-        // Determine chat ID based on chat type
-        if (currentChat.type === 'private') {
-            // FIXED: Use consistent chat ID for private chats
-            messageData.chatId = generateChatId(currentUser.uid, currentChat.id);
-            messageData.receiverId = currentChat.id;
-        } else {
-            messageData.chatId = currentChat.id;
-        }
-        
-        messageData.chatType = currentChat.type;
-        
-        // Handle media upload if present
-        if (selectedMediaFile) {
-            const fileUrl = await uploadFile(selectedMediaFile.file, selectedMediaFile.type);
+        // Handle file upload
+        if (selectedFile) {
+            const fileUrl = await uploadFile(selectedFile.file, selectedFile.type);
             messageData = {
                 ...messageData,
-                type: selectedMediaFile.type,
+                type: selectedFile.type,
                 fileUrl: fileUrl,
-                fileName: selectedMediaFile.file.name,
-                fileSize: selectedMediaFile.file.size,
-                caption: text || ''
+                fileName: selectedFile.file.name,
+                fileSize: selectedFile.file.size,
+                caption: text || '',
+                duration: selectedFile.duration || 0
             };
-            selectedMediaFile = null;
+            selectedFile = null;
+            hideAttachmentMenu();
         }
         
-        console.log("💾 Saving message:", messageData);
+        // Save message
+        const messageRef = await db.collection('messages').add(messageData);
         
-        // Save message to Firestore
-        const docRef = await db.collection('messages').add(messageData);
-        console.log("✅ Message saved with ID:", docRef.id);
-        
-        // Immediately display the message for sender
-        displayMessage(messageData);
+        // Update chat last activity
+        await updateChatActivity(messageData);
         
         // Clear input
         elements.messageInput.value = '';
-        elements.messageInput.focus();
+        elements.messageInput.style.height = 'auto';
         elements.sendBtn.classList.remove('active');
+        elements.recordBtn.classList.add('active');
         
-        // Scroll to bottom
-        setTimeout(() => {
-            elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-        }, 100);
+        console.log("✅ Message sent:", messageRef.id);
         
     } catch (error) {
         console.error("❌ Error sending message:", error);
-        showNotification('Failed to send message: ' + error.message, 'error');
+        showNotification('Send Failed', 'error', error.message);
     }
 }
 
 async function uploadFile(file, type) {
     return new Promise((resolve, reject) => {
         const fileId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        const filePath = `uploads/${currentUser.uid}/${type}s/${fileId}_${file.name}`;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${type}_${fileId}.${fileExt}`;
+        const filePath = `chats/${currentChat.id}/${currentUser.uid}/${type}s/${fileName}`;
+        
         const uploadTask = storage.ref(filePath).put(file);
+        let uploadStartTime = Date.now();
+        
+        // Show progress
+        showUploadProgress(file.name, file.size);
         
         uploadTask.on('state_changed',
-            null,
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                const elapsed = (Date.now() - uploadStartTime) / 1000;
+                const speed = snapshot.bytesTransferred / elapsed;
+                
+                updateUploadProgress(progress, formatFileSize(speed) + '/s');
+            },
             (error) => {
+                hideUploadProgress();
                 reject(error);
             },
             async () => {
                 const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                hideUploadProgress();
                 resolve(downloadURL);
             }
         );
-    });
-}
-
-// FIXED: Generate consistent chat ID for private messages
-function generateChatId(userId1, userId2) {
-    // Sort IDs to ensure consistency
-    const sortedIds = [userId1, userId2].sort();
-    return `private_${sortedIds[0]}_${sortedIds[1]}`;
-}
-
-// ============================================
-// GROUP MANAGEMENT - FIXED
-// ============================================
-
-function openCreateGroupModal() {
-    // Load available users
-    const membersList = document.getElementById('available-members');
-    membersList.innerHTML = '';
-    
-    selectedUsersForGroup.clear();
-    document.getElementById('selected-members').innerHTML = '';
-    
-    contacts.forEach(user => {
-        const userItem = document.createElement('div');
-        userItem.className = 'contact-item';
-        userItem.innerHTML = `
-            <input type="checkbox" id="user-${user.uid}" value="${user.uid}" class="user-checkbox">
-            <div class="item-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="item-info">
-                <div class="item-name">${user.displayName}</div>
-                <div class="item-status">${user.status || 'offline'}</div>
-            </div>
-        `;
         
-        const checkbox = userItem.querySelector('.user-checkbox');
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                selectedUsersForGroup.add(user.uid);
-                addSelectedMember(user);
-            } else {
-                selectedUsersForGroup.delete(user.uid);
-                removeSelectedMember(user.uid);
-            }
-        });
-        
-        membersList.appendChild(userItem);
+        // Cancel upload
+        elements.cancelUpload.addEventListener('click', () => {
+            uploadTask.cancel();
+            hideUploadProgress();
+            reject(new Error('Upload cancelled'));
+        }, { once: true });
     });
-    
-    elements.createGroupModal.classList.add('active');
-    elements.overlay.classList.add('active');
 }
 
-function addSelectedMember(user) {
-    const selectedDiv = document.getElementById('selected-members');
-    const memberTag = document.createElement('div');
-    memberTag.className = 'member-tag';
-    memberTag.innerHTML = `
-        <span>${user.displayName}</span>
-        <button type="button" data-uid="${user.uid}">&times;</button>
-    `;
-    
-    memberTag.querySelector('button').addEventListener('click', (e) => {
-        e.stopPropagation();
-        const uid = e.target.dataset.uid;
-        selectedUsersForGroup.delete(uid);
-        document.getElementById(`user-${uid}`).checked = false;
-        memberTag.remove();
-    });
-    
-    selectedDiv.appendChild(memberTag);
-}
-
-function removeSelectedMember(uid) {
-    const tag = document.querySelector(`.member-tag button[data-uid="${uid}"]`)?.parentElement;
-    if (tag) tag.remove();
-}
-
-// FIXED: Group creation function
-async function createGroup() {
-    const name = document.getElementById('group-name').value.trim();
-    const description = document.getElementById('group-description').value.trim();
-    
-    if (!name) {
-        showNotification('Please enter a group name', 'error');
-        return;
-    }
-    
-    if (selectedUsersForGroup.size === 0) {
-        showNotification('Please select at least one member', 'error');
-        return;
-    }
-    
+async function sendAudioMessage(audioBlob, duration) {
     try {
-        // Add current user to members
-        const members = Array.from(selectedUsersForGroup);
-        members.push(currentUser.uid);
-        
-        // Create group document
-        const groupData = {
-            name: name,
-            description: description || '',
-            createdBy: currentUser.uid,
-            creatorName: currentUser.displayName || currentUser.email.split('@')[0],
-            members: members,
-            memberCount: members.length,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            type: 'group',
-            chatId: `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        };
-        
-        console.log("💾 Creating group:", groupData);
-        
-        // Save group to Firestore
-        const groupRef = await db.collection('groups').add(groupData);
-        const groupId = groupRef.id;
-        console.log("✅ Group created with ID:", groupId);
-        
-        // Update group data with its ID as chatId
-        await groupRef.update({
-            chatId: groupId
+        const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, {
+            type: 'audio/webm'
         });
         
-        // Add initial welcome message
-        const welcomeMessage = {
-            senderId: 'system',
-            senderName: 'System',
-            text: `${currentUser.displayName || currentUser.email.split('@')[0]} created the group "${name}"`,
+        const fileUrl = await uploadFile(audioFile, 'audio');
+        
+        const messageData = {
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName || currentUser.email.split('@')[0],
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            chatId: groupId,
-            chatType: 'group',
-            type: 'system'
+            chatId: currentChat.id,
+            type: 'audio',
+            fileUrl: fileUrl,
+            fileName: audioFile.name,
+            fileSize: audioFile.size,
+            duration: duration,
+            caption: ''
         };
         
-        await db.collection('messages').add(welcomeMessage);
-        
-        showNotification(`Group "${name}" created successfully!`, 'success');
-        
-        // Close modal
-        elements.createGroupModal.classList.remove('active');
-        elements.overlay.classList.remove('active');
-        
-        // Clear form
-        document.getElementById('group-name').value = '';
-        document.getElementById('group-description').value = '';
-        selectedUsersForGroup.clear();
-        document.getElementById('selected-members').innerHTML = '';
-        
-        // Switch to the new group
-        switchToChat({
-            id: groupId,
-            type: 'group',
-            name: name,
-            participants: members
-        });
+        await db.collection('messages').add(messageData);
+        await updateChatActivity(messageData);
         
     } catch (error) {
-        console.error("❌ Error creating group:", error);
-        showNotification('Failed to create group: ' + error.message, 'error');
+        console.error("Error sending audio:", error);
+        showNotification('Audio Send Failed', 'error', error.message);
     }
 }
 
-// ============================================
-// PRIVATE CHATS - FIXED
-// ============================================
-
-function openNewChatModal() {
-    // This is a simplified version - you can expand it
-    showNotification('New chat feature coming soon', 'info');
-}
-
-function startPrivateChat(userId, userName) {
-    // Create chat object for private conversation
-    const chat = {
-        id: userId, // The other user's ID
-        type: 'private',
-        name: userName,
-        participants: [currentUser.uid, userId]
+async function updateChatActivity(message) {
+    const chatRef = db.collection('chats').doc(currentChat.id);
+    
+    const updateData = {
+        lastMessage: {
+            text: message.type === 'text' ? message.text : `Sent a ${message.type}`,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            type: message.type
+        },
+        lastActivity: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    switchToChat(chat);
+    try {
+        await chatRef.set(updateData, { merge: true });
+    } catch (error) {
+        console.error("Error updating chat activity:", error);
+    }
 }
 
 // ============================================
 // ATTACHMENTS & MEDIA
 // ============================================
 
-function toggleAttachmentMenu() {
-    elements.attachmentMenu.classList.toggle('active');
-}
-
-function toggleVoiceRecording() {
-    if (elements.voiceToggle.classList.contains('active')) {
-        stopRecording();
-    } else {
-        startAudioRecording();
+function handleAttachment(type) {
+    hideAttachmentMenu();
+    
+    switch (type) {
+        case 'image':
+            openFilePicker('image/*', 'image');
+            break;
+        case 'video':
+            openFilePicker('video/*', 'video');
+            break;
+        case 'audio':
+            startAudioRecording();
+            break;
+        case 'document':
+            openFilePicker('*', 'file');
+            break;
+        case 'camera':
+            openCamera();
+            break;
+        case 'location':
+            shareLocation();
+            break;
     }
 }
 
-function handleMessageInput() {
-    const hasText = elements.messageInput.value.trim().length > 0;
-    elements.sendBtn.classList.toggle('active', hasText);
+function openFilePicker(accept, type) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = false;
+    
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (type === 'image') {
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview-image').src = e.target.result;
+                elements.imagePreviewModal.classList.add('active');
+                elements.overlay.classList.add('active');
+                selectedFile = { file, type: 'image' };
+            };
+            reader.readAsDataURL(file);
+        } else {
+            selectedFile = { file, type };
+            sendMessage();
+        }
+    };
+    
+    input.click();
 }
 
 function startAudioRecording() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showNotification('Audio recording not supported', 'error');
+        showNotification('Audio Unavailable', 'error', 'Microphone access not supported');
         return;
     }
     
@@ -997,16 +1054,8 @@ function startAudioRecording() {
             audioRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const duration = (Date.now() - recordingStartTime) / 1000;
+                await sendAudioMessage(audioBlob, duration);
                 
-                // Create a file from blob
-                const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, {
-                    type: 'audio/webm'
-                });
-                
-                selectedMediaFile = { file: audioFile, type: 'audio' };
-                await sendMessage();
-                
-                // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
             };
             
@@ -1015,24 +1064,16 @@ function startAudioRecording() {
             recordingStartTime = Date.now();
             startRecordingTimer();
             
-            // Show recorder UI
+            // Show UI
             elements.audioRecorderElement.classList.add('active');
-            elements.voiceToggle.classList.add('active');
+            elements.recordBtn.classList.remove('active');
+            elements.sendBtn.classList.remove('active');
             
         })
         .catch(error => {
-            console.error("Error accessing microphone:", error);
-            showNotification('Microphone access denied', 'error');
+            console.error("Microphone error:", error);
+            showNotification('Microphone Error', 'error', 'Please allow microphone access');
         });
-}
-
-function stopRecording() {
-    if (audioRecorder && audioRecorder.state !== 'inactive') {
-        audioRecorder.stop();
-        stopRecordingTimer();
-        elements.audioRecorderElement.classList.remove('active');
-        elements.voiceToggle.classList.remove('active');
-    }
 }
 
 function cancelRecording() {
@@ -1040,8 +1081,17 @@ function cancelRecording() {
         audioRecorder.stop();
         stopRecordingTimer();
         elements.audioRecorderElement.classList.remove('active');
-        elements.voiceToggle.classList.remove('active');
-        showNotification('Recording cancelled', 'info');
+        elements.recordBtn.classList.add('active');
+        showNotification('Recording Cancelled', 'info');
+    }
+}
+
+function stopAndSendRecording() {
+    if (audioRecorder && audioRecorder.state !== 'inactive') {
+        audioRecorder.stop();
+        stopRecordingTimer();
+        elements.audioRecorderElement.classList.remove('active');
+        elements.recordBtn.classList.add('active');
     }
 }
 
@@ -1049,8 +1099,11 @@ function startRecordingTimer() {
     recordingStartTime = Date.now();
     recordingTimer = setInterval(() => {
         const elapsed = Date.now() - recordingStartTime;
-        document.getElementById('recording-timer').textContent = 
-            formatDuration(elapsed / 1000);
+        const seconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const displaySeconds = seconds % 60;
+        document.getElementById('recording-time').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
     }, 1000);
 }
 
@@ -1077,44 +1130,374 @@ function toggleSidebar() {
     elements.overlay.classList.toggle('active');
 }
 
+function toggleUserMenu() {
+    elements.userMenu.classList.toggle('active');
+    elements.overlay.classList.toggle('active');
+}
+
 function closeAllMenus() {
     elements.sidebar.classList.remove('active');
+    elements.userMenu.classList.remove('active');
     elements.overlay.classList.remove('active');
+    hideAttachmentMenu();
+    closeEmojiPicker();
 }
 
-function switchSidebarView(view) {
-    // Update navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.toggle('active', item.dataset.view === view);
+function switchSidebarSection(section) {
+    // Update buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === section);
     });
     
-    // Show corresponding section
-    document.querySelectorAll('.sidebar-section').forEach(section => {
-        section.classList.toggle('active', section.id === `${view}-section`);
+    // Show section
+    document.querySelectorAll('.sidebar-section').forEach(sec => {
+        sec.classList.toggle('active', sec.id === `${section}-section`);
     });
 }
 
-function showNotification(title, type = 'info', message = '') {
-    // Create simple notification
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <div class="notification-title">${title}</div>
-            ${message ? `<div class="notification-message">${message}</div>` : ''}
+function toggleAttachmentMenu() {
+    elements.attachmentMenu.classList.toggle('active');
+    closeEmojiPicker();
+}
+
+function hideAttachmentMenu() {
+    elements.attachmentMenu.classList.remove('active');
+}
+
+function toggleAudioRecording() {
+    if (elements.audioRecorderElement.classList.contains('active')) {
+        cancelRecording();
+    } else {
+        startAudioRecording();
+    }
+}
+
+function handleMessageInput() {
+    const hasText = elements.messageInput.value.trim().length > 0;
+    elements.sendBtn.classList.toggle('active', hasText);
+    elements.recordBtn.classList.toggle('active', !hasText);
+    
+    // Auto-resize textarea
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+    
+    // Typing indicator
+    if (hasText && !isTyping) {
+        isTyping = true;
+        updateTypingStatus(true);
+    }
+    
+    if (typingTimeout) clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        if (isTyping) {
+            isTyping = false;
+            updateTypingStatus(false);
+        }
+    }, 1000);
+}
+
+function updateTypingStatus(typing) {
+    if (currentChat.type === 'private' && currentChat.id !== 'global') {
+        // Update typing status in Firestore
+        const chatId = generateChatId(currentUser.uid, currentChat.id);
+        db.collection('chats').doc(chatId).update({
+            [`typing.${currentUser.uid}`]: typing ? firebase.firestore.FieldValue.serverTimestamp() : null
+        });
+    }
+}
+
+function toggleEmojiPicker() {
+    elements.emojiPicker.classList.toggle('active');
+    hideAttachmentMenu();
+}
+
+function closeEmojiPicker() {
+    elements.emojiPicker.classList.remove('active');
+}
+
+function setupEmojiPicker() {
+    const emojis = {
+        smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚'],
+        people: ['👨‍🎓', '👩‍🎓', '👨‍🏫', '👩‍🏫', '👨‍💼', '👩‍💼', '👨‍🔬', '👩‍🔬', '👨‍💻', '👩‍💻', '👨‍⚕️', '👩‍⚕️', '👨‍🔧', '👩‍🔧', '👨‍🌾', '👩‍🌾', '👨‍🍳', '👩‍🍳', '👨‍🎤', '👩‍🎤'],
+        nature: ['🌴', '🌵', '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃', '🐚', '🦋', '🐦', '🐠', '🐬', '🐳', '🦁', '🐯', '🐻', '🐼', '🦊'],
+        food: ['🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦'],
+        activities: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳'],
+        objects: ['📚', '📖', '📕', '📗', '📘', '📙', '📓', '📒', '📝', '✏️', '🖊️', '🖋️', '📏', '📐', '✂️', '📎', '📌', '📍', '📁', '📂'],
+        symbols: ['💙', '💚', '💛', '🧡', '❤️', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️'],
+        flags: ['🇹🇿', '🇰🇪', '🇺🇬', '🇷🇼', '🇧🇮', '🇨🇩', '🇸🇸', '🇪🇹', '🇪🇷', '🇩🇯', '🇸🇴', '🇸🇩', '🇪🇬', '🇱🇾', '🇹🇳', '🇩🇿', '🇲🇦', '🇲🇷', '🇸🇳', '🇬🇲']
+    };
+    
+    // Setup categories
+    document.querySelectorAll('.emoji-cat').forEach(cat => {
+        cat.addEventListener('click', function() {
+            const category = this.dataset.cat;
+            
+            // Update active
+            document.querySelectorAll('.emoji-cat').forEach(c => {
+                c.classList.toggle('active', c === this);
+            });
+            
+            // Load emojis
+            loadEmojis(category);
+        });
+    });
+    
+    // Load default
+    loadEmojis('smileys');
+}
+
+function loadEmojis(category) {
+    const emojiGrid = document.getElementById('emoji-grid');
+    const emojiList = {
+        smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚'],
+        people: ['👨‍🎓', '👩‍🎓', '👨‍🏫', '👩‍🏫', '👨‍💼', '👩‍💼', '👨‍🔬', '👩‍🔬', '👨‍💻', '👩‍💻', '👨‍⚕️', '👩‍⚕️', '👨‍🔧', '👩‍🔧', '👨‍🌾', '👩‍🌾', '👨‍🍳', '👩‍🍳', '👨‍🎤', '👩‍🎤'],
+        nature: ['🌴', '🌵', '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃', '🐚', '🦋', '🐦', '🐠', '🐬', '🐳', '🦁', '🐯', '🐻', '🐼', '🦊'],
+        food: ['🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦'],
+        activities: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳'],
+        objects: ['📚', '📖', '📕', '📗', '📘', '📙', '📓', '📒', '📝', '✏️', '🖊️', '🖋️', '📏', '📐', '✂️', '📎', '📌', '📍', '📁', '📂'],
+        symbols: ['💙', '💚', '💛', '🧡', '❤️', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️'],
+        flags: ['🇹🇿', '🇰🇪', '🇺🇬', '🇷🇼', '🇧🇮', '🇨🇩', '🇸🇸', '🇪🇹', '🇪🇷', '🇩🇯', '🇸🇴', '🇸🇩', '🇪🇬', '🇱🇾', '🇹🇳', '🇩🇿', '🇲🇦', '🇲🇷', '🇸🇳', '🇬🇲']
+    }[category] || [];
+    
+    emojiGrid.innerHTML = '';
+    emojiList.forEach(emoji => {
+        const button = document.createElement('button');
+        button.className = 'emoji-item';
+        button.textContent = emoji;
+        button.addEventListener('click', () => {
+            elements.messageInput.value += emoji;
+            elements.messageInput.focus();
+            handleMessageInput();
+            closeEmojiPicker();
+        });
+        emojiGrid.appendChild(button);
+    });
+}
+
+function showUploadProgress(filename, filesize) {
+    elements.uploadFilename.textContent = filename;
+    elements.uploadSpeed.textContent = 'Calculating...';
+    elements.uploadProgress.classList.add('active');
+}
+
+function updateUploadProgress(percentage, speed = '') {
+    elements.progressFill.style.width = `${percentage}%`;
+    elements.uploadPercent.textContent = `${Math.round(percentage)}%`;
+    if (speed) elements.uploadSpeed.textContent = speed;
+}
+
+function hideUploadProgress() {
+    setTimeout(() => {
+        elements.uploadProgress.classList.remove('active');
+        elements.progressFill.style.width = '0%';
+        elements.uploadPercent.textContent = '0%';
+    }, 500);
+}
+
+function scrollToBottom() {
+    const container = elements.messages.parentElement;
+    container.scrollTop = container.scrollHeight;
+}
+
+// ============================================
+// MODAL FUNCTIONS
+// ============================================
+
+function openNewChatModal() {
+    const usersList = document.getElementById('users-list');
+    usersList.innerHTML = '';
+    
+    contacts.forEach(user => {
+        const userItem = document.createElement('div');
+        userItem.className = 'user-item';
+        userItem.innerHTML = `
+            <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
+                ${!user.photoURL ? '<i class="fas fa-user"></i>' : ''}
+            </div>
+            <div class="item-info">
+                <div class="item-name">${user.displayName}</div>
+                <div class="item-desc">${user.role || 'Student'} • ${user.status || 'offline'}</div>
+            </div>
+        `;
+        
+        userItem.addEventListener('click', () => {
+            // Create private chat
+            const chatId = generateChatId(currentUser.uid, user.uid);
+            const chat = {
+                id: user.uid,
+                type: 'private',
+                name: user.displayName,
+                participants: [currentUser.uid, user.uid]
+            };
+            
+            // Create chat document if it doesn't exist
+            db.collection('chats').doc(chatId).set({
+                id: chatId,
+                type: 'private',
+                participants: [currentUser.uid, user.uid],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastActivity: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            switchToChat(chat);
+            elements.newChatModal.classList.remove('active');
+            elements.overlay.classList.remove('active');
+        });
+        
+        usersList.appendChild(userItem);
+    });
+    
+    elements.newChatModal.classList.add('active');
+    elements.overlay.classList.add('active');
+}
+
+function openCreateGroupModal() {
+    const membersList = document.getElementById('available-members-list');
+    membersList.innerHTML = '';
+    
+    selectedUsers.clear();
+    document.getElementById('selected-members-list').innerHTML = `
+        <div class="selected-member" id="current-user-member">
+            <span>You (Admin)</span>
+            <i class="fas fa-crown" title="Admin"></i>
         </div>
     `;
     
-    document.body.appendChild(notification);
+    contacts.forEach(user => {
+        const memberItem = document.createElement('div');
+        memberItem.className = 'member-item';
+        memberItem.innerHTML = `
+            <div class="member-checkbox" data-user-id="${user.uid}"></div>
+            <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
+                ${!user.photoURL ? '<i class="fas fa-user"></i>' : ''}
+            </div>
+            <div class="item-info">
+                <div class="item-name">${user.displayName}</div>
+                <div class="item-desc">${user.role || 'Student'}</div>
+            </div>
+        `;
+        
+        const checkbox = memberItem.querySelector('.member-checkbox');
+        checkbox.addEventListener('click', () => {
+            if (selectedUsers.has(user.uid)) {
+                selectedUsers.delete(user.uid);
+                checkbox.classList.remove('checked');
+                checkbox.innerHTML = '';
+            } else {
+                selectedUsers.add(user.uid);
+                checkbox.classList.add('checked');
+                checkbox.innerHTML = '<i class="fas fa-check"></i>';
+                
+                // Add to selected list
+                const selectedMember = document.createElement('div');
+                selectedMember.className = 'selected-member';
+                selectedMember.innerHTML = `
+                    <span>${user.displayName}</span>
+                    <button type="button" onclick="removeSelectedMember('${user.uid}')">&times;</button>
+                `;
+                document.getElementById('selected-members-list').appendChild(selectedMember);
+            }
+        });
+        
+        membersList.appendChild(memberItem);
+    });
     
-    // Auto-remove after 3 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
+    elements.createGroupModal.classList.add('active');
+    elements.overlay.classList.add('active');
 }
 
-// Export for Firebase config
-window.showAppNotification = showNotification;
+function removeSelectedMember(userId) {
+    selectedUsers.delete(userId);
+    const checkbox = document.querySelector(`.member-checkbox[data-user-id="${userId}"]`);
+    if (checkbox) {
+        checkbox.classList.remove('checked');
+        checkbox.innerHTML = '';
+    }
+    const selectedEl = document.querySelector(`.selected-member button[onclick*="${userId}"]`)?.parentElement;
+    if (selectedEl) selectedEl.remove();
+}
+
+async function createGroup() {
+    const name = document.getElementById('group-name-modal').value.trim();
+    const description = document.getElementById('group-description-modal').value.trim();
+    const privacy = document.getElementById('group-privacy').value;
+    
+    if (!name) {
+        showNotification('Group Name Required', 'error', 'Please enter a group name');
+        return;
+    }
+    
+    if (selectedUsers.size === 0) {
+        showNotification('Members Required', 'error', 'Please select at least one member');
+        return;
+    }
+    
+    try {
+        // Create members array
+        const members = Array.from(selectedUsers);
+        members.push(currentUser.uid);
+        
+        // Create group
+        const groupData = {
+            name: name,
+            description: description,
+            privacy: privacy,
+            createdBy: currentUser.uid,
+            creatorName: currentUser.displayName,
+            members: members,
+            admins: [currentUser.uid],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            settings: {
+                allowMedia: true,
+                allowAudio: true,
+                allowFiles: true,
+                maxFileSize: 10485760
+            }
+        };
+        
+        const groupRef = await db.collection('groups').add(groupData);
+        
+        // Create chat for group
+        await db.collection('chats').doc(groupRef.id).set({
+            id: groupRef.id,
+            type: 'group',
+            name: name,
+            description: description,
+            participants: members,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastActivity: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Add system message
+        await db.collection('messages').add({
+            chatId: groupRef.id,
+            type: 'system',
+            text: `${currentUser.displayName} created the group "${name}"`,
+            senderId: 'system',
+            senderName: 'System',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showNotification('Group Created', 'success', `"${name}" has been created`);
+        
+        // Close modal and switch to group
+        elements.createGroupModal.classList.remove('active');
+        elements.overlay.classList.remove('active');
+        
+        const group = {
+            id: groupRef.id,
+            type: 'group',
+            name: name,
+            participants: members
+        };
+        
+        switchToChat(group);
+        
+    } catch (error) {
+        console.error("Error creating group:", error);
+        showNotification('Group Creation Failed', 'error', error.message);
+    }
+}
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -1125,29 +1508,47 @@ function validateEmail(email) {
     return re.test(email);
 }
 
-function formatTime(date) {
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
 function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+function setupAudioPlayer(playerElement) {
+    const playBtn = playerElement.querySelector('.play-pause-btn');
+    const progress = playerElement.querySelector('.progress-fill');
+    const timeDisplay = playerElement.querySelector('.audio-time');
+    const audioUrl = playerElement.dataset.audioUrl;
+    
+    const audio = new Audio(audioUrl);
+    let isPlaying = false;
+    
+    playBtn.addEventListener('click', () => {
+        if (isPlaying) {
+            audio.pause();
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        } else {
+            audio.play();
+            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        }
+        isPlaying = !isPlaying;
+    });
+    
+    audio.addEventListener('timeupdate', () => {
+        const percent = (audio.currentTime / audio.duration) * 100;
+        progress.style.width = `${percent}%`;
+        
+        const current = formatDuration(audio.currentTime);
+        const total = formatDuration(audio.duration);
+        timeDisplay.textContent = `${current} / ${total}`;
+    });
+    
+    audio.addEventListener('ended', () => {
+        isPlaying = false;
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        progress.style.width = '0%';
+        timeDisplay.textContent = `0:00 / ${formatDuration(audio.duration)}`;
+    });
 }
 
 function updateOnlineCount() {
@@ -1161,18 +1562,22 @@ function updateContactsList() {
     
     elements.contactsList.innerHTML = '';
     contacts.forEach(user => {
-        const contactItem = createContactItem(user);
-        elements.contactsList.appendChild(contactItem);
+        const contact = createContactItem(user);
+        elements.contactsList.appendChild(contact);
     });
 }
 
 function updateGroupsList() {
     if (!elements.groupsList) return;
     
-    elements.groupsList.innerHTML = '';
+    const list = elements.groupsList;
+    const globalItem = list.querySelector('[data-group-id="global"]');
+    list.innerHTML = '';
+    if (globalItem) list.appendChild(globalItem);
+    
     groups.forEach(group => {
         const groupItem = createGroupItem(group);
-        elements.groupsList.appendChild(groupItem);
+        list.appendChild(groupItem);
     });
 }
 
@@ -1180,17 +1585,6 @@ function updateChatsList(chats) {
     if (!elements.chatsList) return;
     
     elements.chatsList.innerHTML = '';
-    
-    // Always show global chat
-    const globalChat = {
-        id: 'global',
-        type: 'group',
-        name: 'Global Chat'
-    };
-    const globalItem = createChatItem(globalChat);
-    elements.chatsList.appendChild(globalItem);
-    
-    // Show other chats
     chats.forEach(chat => {
         const chatItem = createChatItem(chat);
         elements.chatsList.appendChild(chatItem);
@@ -1206,12 +1600,19 @@ function createContactItem(user) {
         </div>
         <div class="item-info">
             <div class="item-name">${user.displayName}</div>
-            <div class="item-status">${user.status || 'offline'}</div>
+            <div class="item-desc">${user.role || 'Student'} • ${user.status || 'offline'}</div>
         </div>
     `;
     
     div.addEventListener('click', () => {
-        startPrivateChat(user.uid, user.displayName);
+        const chatId = generateChatId(currentUser.uid, user.uid);
+        const chat = {
+            id: user.uid,
+            type: 'private',
+            name: user.displayName,
+            participants: [currentUser.uid, user.uid]
+        };
+        switchToChat(chat);
     });
     
     return div;
@@ -1226,17 +1627,18 @@ function createGroupItem(group) {
         </div>
         <div class="item-info">
             <div class="item-name">${group.name}</div>
-            <div class="item-last-message">${group.memberCount || group.members?.length || 0} members</div>
+            <div class="item-desc">${group.members?.length || 0} members</div>
         </div>
     `;
     
     div.addEventListener('click', () => {
-        switchToChat({
+        const chat = {
             id: group.id,
             type: 'group',
             name: group.name,
-            participants: group.members
-        });
+            participants: group.members || []
+        };
+        switchToChat(chat);
     });
     
     return div;
@@ -1251,8 +1653,9 @@ function createChatItem(chat) {
         </div>
         <div class="item-info">
             <div class="item-name">${chat.name || 'Chat'}</div>
-            <div class="item-last-message">${chat.type === 'group' ? 'Group chat' : 'Private chat'}</div>
+            <div class="item-last-message">${chat.lastMessage?.text || 'No messages yet'}</div>
         </div>
+        <div class="item-time">${chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : ''}</div>
     `;
     
     div.addEventListener('click', () => {
@@ -1262,5 +1665,50 @@ function createChatItem(chat) {
     return div;
 }
 
+function searchContacts(query) {
+    if (!query) {
+        updateContactsList();
+        return;
+    }
+    
+    const filtered = Array.from(contacts.values()).filter(user =>
+        user.displayName.toLowerCase().includes(query.toLowerCase()) ||
+        user.email.toLowerCase().includes(query.toLowerCase()) ||
+        (user.role && user.role.toLowerCase().includes(query.toLowerCase()))
+    );
+    
+    if (elements.contactsList) {
+        elements.contactsList.innerHTML = '';
+        filtered.forEach(user => {
+            const contact = createContactItem(user);
+            elements.contactsList.appendChild(contact);
+        });
+    }
+}
+
+function handleUserMenuAction(action) {
+    switch (action) {
+        case 'profile':
+            showNotification('Profile', 'info', 'Profile editing coming soon');
+            break;
+        case 'status':
+            showNotification('Status', 'info', 'Status changing coming soon');
+            break;
+        case 'notifications':
+            showNotification('Notifications', 'info', 'Notification settings coming soon');
+            break;
+        case 'privacy':
+            showNotification('Privacy', 'info', 'Privacy settings coming soon');
+            break;
+        case 'help':
+            showNotification('Help', 'info', 'Help center coming soon');
+            break;
+        case 'about':
+            showNotification('About', 'info', 'University Chat v2.0 - Zanzibar University');
+            break;
+    }
+    toggleUserMenu();
+}
+
 // Initialize app
-console.log("🎉 Modern Chat App ready!");
+console.log("🎉 University Chat Application ready!");

@@ -1,240 +1,290 @@
 // ============================================
-// FIREBASE CONFIGURATION - COMPLETE & FIXED
+// FIREBASE CONFIGURATION - University Chat
 // ============================================
 
-// IMPORTANT: REPLACE THESE VALUES WITH YOUR OWN FROM FIREBASE CONSOLE
+// IMPORTANT: Replace with your Firebase configuration
 const firebaseConfig = {
-      apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
+  apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
   authDomain: "my-chat-app-e1a85.firebaseapp.com",
   databaseURL: "https://my-chat-app-e1a85-default-rtdb.firebaseio.com",
   projectId: "my-chat-app-e1a85",
   storageBucket: "my-chat-app-e1a85.firebasestorage.app",
   messagingSenderId: "1018726193704",
-  appId: "1:1018726193704:web:58ff7905d107248e86331d"
-
+  appId: "1:1018726193704:web:58ff7905d107248e86331d",
+  measurementId: "G-MEASUREMENT_ID" // Optional
 };
 
-console.log("🔥 Initializing Firebase...");
+console.log("🎓 University Chat - Initializing Firebase...");
 
 // Initialize Firebase
 try {
-    firebase.initializeApp(firebaseConfig);
-    console.log("✅ Firebase initialized successfully");
-    
-    // Show notification if app is loaded
-    if (typeof showNotification === 'function') {
-        showNotification("Firebase Connected", "success");
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        console.log("✅ Firebase initialized successfully");
+        
+        // Show notification
+        showNotification("Firebase Connected", "success", "Welcome to University Chat!");
+    } else {
+        console.log("ℹ️ Firebase already initialized");
     }
-    
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    
-    // Show error notification
-    if (typeof showNotification === 'function') {
-        showNotification("Firebase connection failed", "error", error.message);
-    } else {
-        alert("Firebase failed to initialize. Please check your configuration.\nError: " + error.message);
-    }
+    showNotification("Connection Error", "error", "Failed to connect to Firebase");
 }
 
-// Initialize services
+// Initialize Firebase services
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage(); // Added for file/audio sharing
+const storage = firebase.storage();
+const messaging = firebase.messaging();
 
-console.log("✅ Firebase services initialized");
-
-// Enable offline persistence for better user experience
+// Enable offline persistence
 db.enablePersistence()
     .then(() => {
         console.log("📦 Offline persistence enabled");
-        if (typeof showNotification === 'function') {
-            showNotification("Offline mode enabled", "info");
-        }
+        showNotification("Offline Mode", "info", "You can now use chat offline");
     })
     .catch((err) => {
-        console.log("📦 Persistence failed:", err);
+        console.log("📦 Persistence warning:", err);
         if (err.code === 'failed-precondition') {
-            console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+            console.log("Multiple tabs open - persistence enabled in first tab only");
         } else if (err.code === 'unimplemented') {
-            console.log("The current browser doesn't support persistence.");
+            console.log("Browser doesn't support persistence");
         }
     });
 
-// Set Firestore settings for better performance
-db.settings({
-    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-});
-
-// Helper function to check if user is online
-function checkNetworkStatus() {
-    const status = navigator.onLine ? 'online' : 'offline';
-    console.log("🌐 Network status:", status);
-    return navigator.onLine;
+// Firebase performance monitoring (optional)
+if (firebase.performance) {
+    const perf = firebase.performance();
+    console.log("📊 Performance monitoring enabled");
 }
 
-// Network status monitoring
-window.addEventListener('online', () => {
-    console.log("🌐 App is back online");
-    if (typeof showNotification === 'function') {
-        showNotification("Back online", "success");
+// Firebase analytics (optional)
+if (firebase.analytics) {
+    const analytics = firebase.analytics();
+    analytics.logEvent('app_initialized');
+    console.log("📈 Analytics enabled");
+}
+
+// Request notification permission
+function requestNotificationPermission() {
+    console.log("🔔 Requesting notification permission...");
+    
+    if (!("Notification" in window)) {
+        console.log("This browser does not support notifications");
+        return;
+    }
+    
+    if (Notification.permission === "granted") {
+        console.log("Notification permission already granted");
+        setupFCM();
+    } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Notification permission granted");
+                setupFCM();
+            }
+        });
+    }
+}
+
+// Setup Firebase Cloud Messaging
+function setupFCM() {
+    if (!messaging) return;
+    
+    // Get FCM token
+    messaging.getToken({ vapidKey: "YOUR_VAPID_KEY_HERE" })
+        .then((currentToken) => {
+            if (currentToken) {
+                console.log("FCM Token:", currentToken);
+                // Send token to your server or save in Firestore
+                if (auth.currentUser) {
+                    db.collection('users').doc(auth.currentUser.uid).update({
+                        fcmToken: currentToken,
+                        notificationEnabled: true
+                    });
+                }
+            } else {
+                console.log('No registration token available.');
+            }
+        })
+        .catch((err) => {
+            console.log('An error occurred while retrieving token:', err);
+        });
+    
+    // Handle incoming messages
+    messaging.onMessage((payload) => {
+        console.log('Message received:', payload);
+        
+        // Show notification
+        if (Notification.permission === "granted") {
+            const title = payload.notification?.title || "New Message";
+            const options = {
+                body: payload.notification?.body || "You have a new message",
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: 'chat-message',
+                renotify: true,
+                data: payload.data || {}
+            };
+            
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, options);
+            });
+        }
+    });
+}
+
+// Initialize notifications when user is logged in
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        setTimeout(requestNotificationPermission, 2000);
     }
 });
 
-window.addEventListener('offline', () => {
-    console.log("🌐 App is offline");
-    if (typeof showNotification === 'function') {
-        showNotification("You are offline", "warning", "Messages will be sent when you reconnect");
+// Helper function for notifications
+function showNotification(title, type = "info", message = "") {
+    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-icon">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                            type === 'error' ? 'exclamation-circle' : 
+                            type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        </div>
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+        <button class="notification-close">&times;</button>
+    `;
+    
+    const container = document.getElementById('notifications-container');
+    if (container) {
+        container.appendChild(notification);
+        
+        // Add close functionality
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
+            notification.style.animation = 'slideInRight 0.3s ease reverse';
+            setTimeout(() => notification.remove(), 300);
+        });
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideInRight 0.3s ease reverse';
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 5000);
     }
-});
+}
 
-// Initialize network status
-checkNetworkStatus();
+// Database initialization function
+async function initializeDatabase() {
+    console.log("🗄️ Initializing database structure...");
+    
+    try {
+        // Create default collections if needed
+        const collections = ['users', 'messages', 'chats', 'groups'];
+        
+        for (const collectionName of collections) {
+            // Just try to read to see if collection exists
+            const snapshot = await db.collection(collectionName).limit(1).get();
+            console.log(`✅ Collection "${collectionName}" exists`);
+        }
+        
+        // Create global chat if it doesn't exist
+        const globalChatRef = db.collection('chats').doc('global');
+        const globalChat = await globalChatRef.get();
+        
+        if (!globalChat.exists) {
+            await globalChatRef.set({
+                id: 'global',
+                type: 'group',
+                name: 'Global Chat',
+                description: 'University-wide chat room',
+                createdBy: 'system',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                participants: ['all'],
+                isPublic: true,
+                settings: {
+                    allowMedia: true,
+                    allowAudio: true,
+                    allowFiles: true,
+                    maxFileSize: 10485760 // 10MB
+                }
+            });
+            console.log("✅ Created global chat");
+        }
+        
+        // Create welcome message
+        const welcomeMessage = await db.collection('messages')
+            .where('chatId', '==', 'global')
+            .where('type', '==', 'system')
+            .limit(1)
+            .get();
+        
+        if (welcomeMessage.empty) {
+            await db.collection('messages').add({
+                chatId: 'global',
+                type: 'system',
+                text: 'Welcome to University Global Chat! Start connecting with students and faculty.',
+                senderId: 'system',
+                senderName: 'System',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log("✅ Added welcome message");
+        }
+        
+    } catch (error) {
+        console.error("❌ Database initialization error:", error);
+    }
+}
+
+// Call database initialization
+initializeDatabase();
+
+// Utility functions
+function generateChatId(user1, user2) {
+    return [user1, user2].sort().join('_');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatTime(date) {
+    if (!date) return 'Just now';
+    
+    const now = new Date();
+    const msgDate = date.toDate ? date.toDate() : new Date(date);
+    const diff = now - msgDate;
+    
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff < 604800000) return msgDate.toLocaleDateString([], { weekday: 'short' });
+    
+    return msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 // Export for use in other files
 window.auth = auth;
 window.db = db;
 window.storage = storage;
+window.messaging = messaging;
 window.firebase = firebase;
-window.checkNetworkStatus = checkNetworkStatus;
+window.showNotification = showNotification;
+window.generateChatId = generateChatId;
+window.formatFileSize = formatFileSize;
+window.formatTime = formatTime;
 
-// Simple notification function (in case app.js hasn't loaded yet)
-window.showFirebaseNotification = function(title, type = "info", message = "") {
-    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
-    
-    // Try to use app's notification system if available
-    if (typeof showNotification === 'function') {
-        showNotification(title, type, message);
-    } else {
-        // Fallback to console and alert for critical errors
-        if (type === 'error') {
-            alert(`${title}: ${message}`);
-        }
-    }
-};
-
-// Test Firebase connection
-async function testFirebaseConnection() {
-    console.log("🔍 Testing Firebase connection...");
-    
-    try {
-        // Test Firestore connection
-        const testRef = db.collection('test_connection').doc('ping');
-        await testRef.set({
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            test: "Firebase is working"
-        });
-        
-        console.log("✅ Firestore connection test passed");
-        
-        // Test Storage connection
-        const storageRef = storage.ref('test/test.txt');
-        const testBlob = new Blob(['Firebase Storage Test'], { type: 'text/plain' });
-        
-        console.log("✅ Firebase services are ready");
-        return true;
-        
-    } catch (error) {
-        console.error("❌ Firebase connection test failed:", error);
-        window.showFirebaseNotification("Firebase Error", "error", error.message);
-        return false;
-    }
-}
-
-// Run connection test after a short delay
-setTimeout(() => {
-    if (window.location.href.includes('chat-screen') || document.getElementById('chat-screen')) {
-        testFirebaseConnection();
-    }
-}, 3000);
-
-// Helper function to get current user's UID safely
-window.getCurrentUserId = function() {
-    if (auth.currentUser) {
-        return auth.currentUser.uid;
-    }
-    return null;
-};
-
-// Helper function to check if user is authenticated
-window.isUserAuthenticated = function() {
-    return auth.currentUser !== null;
-};
-
-// Firebase error handler
-window.handleFirebaseError = function(error, context = "") {
-    console.error(`❌ Firebase Error [${context}]:`, error);
-    
-    let userMessage = "An error occurred";
-    
-    // Common Firebase error codes
-    switch (error.code) {
-        case 'permission-denied':
-            userMessage = "You don't have permission to perform this action";
-            break;
-        case 'unavailable':
-            userMessage = "Service is temporarily unavailable. Please check your internet connection";
-            break;
-        case 'failed-precondition':
-            userMessage = "Operation failed. Please refresh the page";
-            break;
-        case 'already-exists':
-            userMessage = "This item already exists";
-            break;
-        case 'not-found':
-            userMessage = "Requested item was not found";
-            break;
-        default:
-            userMessage = error.message || "An unexpected error occurred";
-    }
-    
-    if (typeof showNotification === 'function') {
-        showNotification("Error", "error", userMessage);
-    }
-    
-    return userMessage;
-};
-
-// Initialize Firebase Auth state listener (basic version)
-auth.onAuthStateChanged((user) => {
-    console.log("👤 Auth state changed:", user ? `User ${user.email} logged in` : "No user");
-    
-    // Update UI if elements exist
-    if (user) {
-        // User is signed in
-        if (document.getElementById('user-name')) {
-            document.getElementById('user-name').textContent = user.displayName || user.email.split('@')[0];
-        }
-        
-        // Set user avatar if element exists
-        const avatar = document.getElementById('user-avatar');
-        if (avatar) {
-            if (user.photoURL) {
-                avatar.style.backgroundImage = `url(${user.photoURL})`;
-                avatar.style.backgroundSize = 'cover';
-                avatar.innerHTML = '';
-            } else {
-                const initial = (user.displayName || user.email).charAt(0).toUpperCase();
-                avatar.innerHTML = `<i class="fas fa-user"></i>`;
-                avatar.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            }
-        }
-    } else {
-        // User is signed out
-        if (document.getElementById('auth-screen')) {
-            document.getElementById('auth-screen').style.display = 'flex';
-        }
-        if (document.getElementById('chat-screen')) {
-            document.getElementById('chat-screen').style.display = 'none';
-        }
-    }
-});
-
-// Firebase performance monitoring (optional)
-if (typeof firebase.performance !== 'undefined') {
-    const perf = firebase.performance();
-    console.log("📊 Firebase Performance Monitoring enabled");
-}
-
-
-console.log("🚀 Firebase configuration complete and ready!");
+console.log("✅ Firebase configuration complete");
