@@ -4,14 +4,16 @@
 
 // IMPORTANT: Replace with your actual Firebase config from console
 const firebaseConfig = {
-  apiKey: "AIzaSyB-2B87cK9ukzv9HUbWX7yYZFpSpolw1e4",
-  authDomain: "my-chat-app-e1a85.firebaseapp.com",
-  projectId: "my-chat-app-e1a85",
-  storageBucket: "my-chat-app-e1a85.firebasestorage.app",
-  messagingSenderId: "1018726193704",
-  appId: "1:1018726193704:web:58ff7905d107248e86331d"
+  apiKey: "AIzaSyA2z6IOIj5N-cDk76CxKNypzLtj5MOiMSo",
+  authDomain: "zanzibar-university-chat.firebaseapp.com",
+  projectId: "zanzibar-university-chat",
+  storageBucket: "zanzibar-university-chat.firebasestorage.app",
+  messagingSenderId: "343255573992",
+  appId: "1:343255573992:web:098a49d6865ea1c5e8705d",
+  measurementId: "G-Q16F2X404E"
 
 };
+vapidKey: 'BA0cY9mtUzbVxQuBS70IcqSkqk-PKILTLUMQuz5II9vzzvcO3XYIsouaM-KH0uX6X9T_pxiofCUPyRl2CaKvb-Q' 
 
 console.log("🎓 Initializing Zanzibar University Chat...");
 
