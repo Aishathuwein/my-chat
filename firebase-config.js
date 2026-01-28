@@ -4,7 +4,8 @@
 
 // IMPORTANT: Replace with your actual Firebase config from console
 const firebaseConfig = {
-  apiKey: "AIzaSyA2z6IOIj5N-cDk76CxKNypzLtj5MOiMSo",
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  apiKey: "AIzaSyCRP1WfiwHSrjtjudC6D9OGgNgrXQkiI5Q",
   authDomain: "zanzibar-university-chat.firebaseapp.com",
   projectId: "zanzibar-university-chat",
   storageBucket: "zanzibar-university-chat.firebasestorage.app",
@@ -12,70 +13,71 @@ const firebaseConfig = {
   appId: "1:343255573992:web:098a49d6865ea1c5e8705d",
   measurementId: "G-Q16F2X404E"
 
+
 };
-const vapidKey = 'BA0cY9mtUzbVxQuBS70IcqSkqk-PKILTLUMQuz5II9vzzvcO3XYIsouaM-KH0uX6X9T_pxiofCUPyRl2CaKvb-Q';
 
 
-console.log("🎓 Initializing Firebase...");
+console.log("🎓 Initializing Zanzibar University Chat...");
 
 // Initialize Firebase
 try {
-    // Check if already initialized
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
         console.log("✅ Firebase initialized successfully");
     } else {
-        console.log("✅ Firebase already initialized");
+        firebase.app(); // if already initialized, use that one
     }
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    alert("Firebase failed to initialize. Please check your configuration.");
+    showNotification("Firebase connection failed", "error");
 }
 
-// Initialize services with error handling
-let auth, db, storage;
-try {
-    auth = firebase.auth();
-    db = firebase.firestore();
-    storage = firebase.storage();
-    console.log("✅ Firebase services initialized");
-} catch (error) {
-    console.error("❌ Failed to initialize services:", error);
-    alert("Failed to initialize Firebase services");
-}
+// Initialize services
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+const messaging = firebase.messaging?.isSupported() ? firebase.messaging() : null;
 
-// Set Firestore settings for better performance
-if (db) {
-    db.settings({
-        cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-        ignoreUndefinedProperties: true
+// Enable offline persistence
+db.enablePersistence()
+    .then(() => {
+        console.log("📦 Offline persistence enabled");
+    })
+    .catch((err) => {
+        console.log("📦 Persistence error:", err);
     });
 
-    // Enable offline persistence
-    db.enablePersistence()
-        .then(() => {
-            console.log("📦 Offline persistence enabled");
-        })
-        .catch((err) => {
-            console.log("📦 Persistence error:", err.code);
-            if (err.code === 'failed-precondition') {
-                console.log("Multiple tabs open");
-            } else if (err.code === 'unimplemented') {
-                console.log("Browser doesn't support persistence");
-            }
-        });
-}
+// Set Firestore settings
+db.settings({
+    ignoreUndefinedProperties: true
+});
 
-// Helper function for notifications
+// Global notification function
 function showNotification(title, type = "info", message = "") {
+    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
     if (typeof window.showAppNotification === 'function') {
         window.showAppNotification(title, type, message);
     } else {
-        console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
-        // Simple alert for critical errors during setup
-        if (type === 'error' && message.includes('Firebase')) {
-            setTimeout(() => alert(`${title}: ${message}`), 1000);
-        }
+        // Create basic notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            background: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#2ecc71' : '#3498db'};
+            color: white;
+            border-radius: 5px;
+            z-index: 9999;
+            animation: fadeIn 0.3s;
+        `;
+        notification.innerHTML = `<strong>${title}</strong><br>${message}`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'fadeOut 0.3s';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 }
 
@@ -86,4 +88,4 @@ window.storage = storage;
 window.firebase = firebase;
 window.showFirebaseNotification = showNotification;
 
-console.log("✅ Firebase setup complete");
+console.log("✅ Firebase services ready");
