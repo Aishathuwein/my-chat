@@ -1,6 +1,31 @@
 // ============================================
 // ZANZIBAR UNIVERSITY CHAT - COMPLETE WORKING SYSTEM
 // ============================================
+// Initialize storage with error handling
+function initializeStorage() {
+    if (!firebase.apps.length) {
+        console.error("Firebase not initialized");
+        return false;
+    }
+    
+    try {
+        // Test storage connection
+        const storageRef = storage.ref();
+        console.log("Storage initialized:", storageRef);
+        return true;
+    } catch (error) {
+        console.error("Storage initialization failed:", error);
+        return false;
+    }
+}
+
+// Call this after Firebase initialization
+setTimeout(() => {
+    const storageReady = initializeStorage();
+    if (!storageReady) {
+        showNotification("File storage not available", "warning");
+    }
+}, 2000);
 
 console.log("🎓 Zanzibar University Chat starting...");
 
@@ -379,6 +404,139 @@ function setupEventListeners() {
     });
     
     console.log("✅ All event listeners setup complete");
+}
+// ============================================
+// ATTACHMENT HANDLING - COMPLETE WORKING
+// ============================================
+
+function handleAttachment(type) {
+    UI.attachmentMenu.classList.remove('active');
+    
+    switch (type) {
+        case 'image':
+        case 'document':
+            openFilePicker(type);
+            break;
+        case 'camera':
+            openCamera();
+            break;
+        case 'audio':
+            startAudioRecording();
+            break;
+        case 'location':
+            shareLocation();
+            break;
+    }
+}
+
+function openFilePicker(accept) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept === 'image' ? 'image/*' : '*/*';
+    input.multiple = false;
+    
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        console.log("File selected:", file.name, file.type, file.size);
+        
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+            showNotification('File too large. Maximum size is 10MB.', 'error');
+            return;
+        }
+        
+        // Validate file type
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (accept === 'image' && !validImageTypes.includes(file.type)) {
+            showNotification('Please select a valid image file (JPEG, PNG, GIF, WebP)', 'error');
+            return;
+        }
+        
+        if (accept === 'image') {
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const previewContent = document.getElementById('preview-content');
+                if (previewContent) {
+                    previewContent.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview" style="max-width: 100%; border-radius: 8px; max-height: 400px; object-fit: contain;">
+                        <div class="preview-caption" style="margin-top: 15px;">
+                            <input type="text" id="image-caption" placeholder="Add a caption (optional)" 
+                                   style="width: 100%; padding: 10px; border: 1px solid var(--zu-border); border-radius: 4px;">
+                        </div>
+                    `;
+                    
+                    UI.filePreviewModal.classList.add('active');
+                    
+                    // Handle send button
+                    const sendBtn = document.getElementById('send-file-btn');
+                    if (sendBtn) {
+                        sendBtn.onclick = () => {
+                            const caption = document.getElementById('image-caption')?.value || '';
+                            AppState.selectedFile = {
+                                file: file,
+                                type: 'image',
+                                name: file.name,
+                                size: file.size,
+                                caption: caption
+                            };
+                            UI.filePreviewModal.classList.remove('active');
+                            sendMessage();
+                        };
+                    }
+                }
+            };
+            reader.onerror = () => {
+                showNotification('Error reading file', 'error');
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // For documents, send immediately
+            AppState.selectedFile = {
+                file: file,
+                type: 'file',
+                name: file.name,
+                size: file.size
+            };
+            sendMessage();
+        }
+    };
+    
+    input.onerror = () => {
+        showNotification('Error selecting file', 'error');
+    };
+    
+    input.click();
+}
+
+// Test function to verify storage
+async function testStorageUpload() {
+    try {
+        // Create a test file
+        const testContent = 'Test file for storage verification';
+        const testFile = new File([testContent], 'test.txt', { type: 'text/plain' });
+        
+        console.log("Testing storage upload...");
+        
+        const timestamp = Date.now();
+        const storageRef = storage.ref(`test_uploads/test_${timestamp}.txt`);
+        
+        await storageRef.put(testFile);
+        console.log("✅ Storage upload test successful");
+        
+        const downloadURL = await storageRef.getDownloadURL();
+        console.log("Download URL:", downloadURL);
+        
+        // Clean up
+        await storageRef.delete();
+        
+        return true;
+    } catch (error) {
+        console.error("❌ Storage upload test failed:", error);
+        return false;
+    }
 }
 
 function setupAuthListener() {
@@ -923,6 +1081,7 @@ async function loadUsersForNewGroup() {
             
             const userItem = document.createElement('div');
             userItem.className = 'contact-item';
+            userItem.dataset.userId = user.uid;
             userItem.innerHTML = `
                 <input type="checkbox" class="user-checkbox" id="group-user-${user.uid}" value="${user.uid}">
                 <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
@@ -943,7 +1102,14 @@ async function loadUsersForNewGroup() {
                     AppState.selectedUsers.delete(user.uid);
                     removeSelectedMember(user.uid);
                 }
-                console.log('Selected users:', Array.from(AppState.selectedUsers));
+            });
+            
+            // Also make the whole item clickable
+            userItem.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
             });
             
             membersList.appendChild(userItem);
@@ -955,7 +1121,7 @@ async function loadUsersForNewGroup() {
         console.error("❌ Error loading users for group:", error);
         const membersList = document.getElementById('available-members');
         if (membersList) {
-            membersList.innerHTML = '<div class="error">Failed to load users</div>';
+            membersList.innerHTML = '<div class="error">Failed to load users: ' + error.message + '</div>';
         }
     }
 }
@@ -1014,23 +1180,47 @@ async function createGroup() {
         const members = Array.from(AppState.selectedUsers);
         members.push(AppState.currentUser.uid);
         
+        // Get member details
+        const memberDetails = {};
+        for (const memberId of members) {
+            const userDoc = await db.collection('users').doc(memberId).get();
+            if (userDoc.exists) {
+                const user = userDoc.data();
+                memberDetails[memberId] = {
+                    uid: user.uid,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    email: user.email,
+                    photoURL: user.photoURL
+                };
+            }
+        }
+        
+        // Generate group ID
+        const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
         // Create group data
         const groupData = {
+            id: groupId,
             name: name,
             description: description,
             createdBy: AppState.currentUser.uid,
             creatorName: AppState.currentUser.displayName || AppState.currentUser.email.split('@')[0],
+            creatorEmail: AppState.currentUser.email,
             members: members,
+            memberDetails: memberDetails,
             admins: [AppState.currentUser.uid],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastActivity: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'group',
             memberCount: members.length
         };
         
+        console.log("Creating group with data:", groupData);
+        
         // Create group in Firestore
-        const groupRef = await db.collection('groups').add(groupData);
-        const groupId = groupRef.id;
+        await db.collection('groups').doc(groupId).set(groupData);
+        console.log("Group created successfully:", groupId);
         
         // Also create a chat document for the group
         const chatData = {
@@ -1040,12 +1230,14 @@ async function createGroup() {
             description: description,
             groupId: groupId,
             participants: members,
+            participantDetails: memberDetails,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastMessageAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         await db.collection('chats').doc(groupId).set(chatData);
+        console.log("Chat created for group");
         
         // Add system message
         await db.collection('messages').add({
@@ -1054,15 +1246,21 @@ async function createGroup() {
             text: `${AppState.currentUser.displayName} created the group "${name}"`,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             senderId: 'system',
-            senderName: 'System'
+            senderName: 'System',
+            status: 'sent'
         });
         
-        // Add members to group in users collection
+        // Update each member's groups array
+        const batch = db.batch();
         for (const memberId of members) {
-            await db.collection('users').doc(memberId).update({
-                groups: firebase.firestore.FieldValue.arrayUnion(groupId)
+            const userRef = db.collection('users').doc(memberId);
+            batch.update(userRef, {
+                groups: firebase.firestore.FieldValue.arrayUnion(groupId),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
+        await batch.commit();
+        console.log("Updated all members' groups");
         
         showNotification(`Group "${name}" created successfully!`, 'success');
         
@@ -1081,19 +1279,24 @@ async function createGroup() {
                 name: name,
                 description: description
             });
-        }, 500);
+        }, 1000);
         
     } catch (error) {
         console.error("❌ Error creating group:", error);
         
-        // More detailed error messages
+        // Detailed error messages
+        let errorMessage = 'Failed to create group';
         if (error.code === 'permission-denied') {
-            showNotification('Permission denied. Check Firebase rules.', 'error');
+            errorMessage = 'Permission denied. Check Firebase rules for groups collection.';
         } else if (error.code === 'unavailable') {
-            showNotification('Network error. Please check your connection.', 'error');
+            errorMessage = 'Network error. Please check your connection.';
+        } else if (error.message.includes('quota')) {
+            errorMessage = 'Storage quota exceeded. Try with fewer members.';
         } else {
-            showNotification('Failed to create group: ' + error.message, 'error');
+            errorMessage = error.message;
         }
+        
+        showNotification(errorMessage, 'error');
     }
 }
 
@@ -1365,10 +1568,12 @@ async function sendMessage() {
     }
     
     try {
+        console.log("Sending message...");
+        
         let messageData = {
             chatId: AppState.currentChat.id,
             senderId: AppState.currentUser.uid,
-            senderName: AppState.currentUser.displayName,
+            senderName: AppState.currentUser.displayName || AppState.currentUser.email.split('@')[0],
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'text',
             text: text,
@@ -1377,26 +1582,39 @@ async function sendMessage() {
         
         // Handle file upload if present
         if (AppState.selectedFile) {
-            const fileUrl = await uploadFile(AppState.selectedFile);
-            messageData = {
-                ...messageData,
-                type: AppState.selectedFile.type,
-                fileUrl: fileUrl,
-                fileName: AppState.selectedFile.name,
-                fileSize: AppState.selectedFile.size,
-                caption: text
-            };
+            console.log("Uploading file:", AppState.selectedFile);
             
-            if (AppState.selectedFile.type === 'audio') {
-                messageData.duration = AppState.selectedFile.duration || 0;
+            try {
+                const fileUrl = await uploadFile(AppState.selectedFile);
+                console.log("File uploaded successfully:", fileUrl);
+                
+                messageData = {
+                    ...messageData,
+                    type: AppState.selectedFile.type,
+                    fileUrl: fileUrl,
+                    fileName: AppState.selectedFile.name,
+                    fileSize: AppState.selectedFile.size,
+                    caption: text || ''
+                };
+                
+                if (AppState.selectedFile.type === 'audio') {
+                    messageData.duration = AppState.selectedFile.duration || 0;
+                }
+                
+                AppState.selectedFile = null;
+                
+            } catch (uploadError) {
+                console.error("File upload failed:", uploadError);
+                throw new Error(`File upload failed: ${uploadError.message}`);
             }
-            
-            AppState.selectedFile = null;
         }
         
         // Save message to Firestore
+        console.log("Saving message to Firestore:", messageData);
         const messageRef = await db.collection('messages').add(messageData);
         messageData.id = messageRef.id;
+        
+        console.log("Message saved with ID:", messageRef.id);
         
         // Update chat's last message
         await updateChatLastMessage(messageData);
@@ -1406,44 +1624,112 @@ async function sendMessage() {
         UI.messageInput.focus();
         UI.sendBtn.classList.remove('active');
         
-        // Send push notification to other participants
-        await sendPushNotification(messageData);
+        showNotification('Message sent', 'success');
         
     } catch (error) {
-        console.error("Error sending message:", error);
-        showNotification('Failed to send message', 'error');
+        console.error("❌ Error sending message:", error);
+        
+        // Detailed error messages
+        let errorMessage = 'Failed to send message';
+        if (error.message.includes('permission-denied')) {
+            errorMessage = 'Permission denied. Check Firebase rules.';
+        } else if (error.message.includes('storage/unauthorized')) {
+            errorMessage = 'Unauthorized to upload files. Check Storage rules.';
+        } else if (error.message.includes('network')) {
+            errorMessage = 'Network error. Check your connection.';
+        } else {
+            errorMessage = error.message;
+        }
+        
+        showNotification(errorMessage, 'error');
     }
 }
 
 async function uploadFile(file) {
     return new Promise((resolve, reject) => {
+        if (!storage) {
+            reject(new Error("Storage not initialized"));
+            return;
+        }
+
         // Show upload progress
         showUploadProgress(file.name, file.size);
         
         // Generate unique file name
-        const fileId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2, 15);
         const fileExt = file.name.split('.').pop();
-        const fileName = `${fileId}.${fileExt}`;
-        const filePath = `uploads/${AppState.currentUser.uid}/${AppState.currentChat.id}/${fileName}`;
+        const fileName = `${timestamp}_${randomId}.${fileExt}`;
         
-        // Upload to Firebase Storage
-        const uploadTask = storage.ref(filePath).put(file);
+        // Create storage path
+        const filePath = `chats/${AppState.currentChat.id}/${fileName}`;
+        const storageRef = storage.ref(filePath);
         
+        // Create metadata
+        const metadata = {
+            contentType: file.type,
+            customMetadata: {
+                uploadedBy: AppState.currentUser.uid,
+                uploadedAt: new Date().toISOString(),
+                chatId: AppState.currentChat.id
+            }
+        };
+        
+        // Start upload
+        const uploadTask = storageRef.put(file, metadata);
+        
+        // Store upload task for cancellation
         AppState.uploadTask = uploadTask;
         
+        // Monitor upload progress
         uploadTask.on('state_changed',
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 updateUploadProgress(progress);
+                
+                switch (snapshot.state) {
+                    case firebase.storage.TaskState.PAUSED:
+                        console.log('Upload is paused');
+                        break;
+                    case firebase.storage.TaskState.RUNNING:
+                        console.log('Upload is running');
+                        break;
+                }
             },
             (error) => {
+                console.error("Upload error:", error);
                 hideUploadProgress();
-                reject(error);
+                
+                // Specific error handling
+                let errorMessage = "Upload failed";
+                switch (error.code) {
+                    case 'storage/unauthorized':
+                        errorMessage = "Unauthorized to upload files";
+                        break;
+                    case 'storage/canceled':
+                        errorMessage = "Upload canceled";
+                        break;
+                    case 'storage/unknown':
+                        errorMessage = "Unknown upload error";
+                        break;
+                }
+                
+                reject(new Error(errorMessage));
             },
             async () => {
-                const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                hideUploadProgress();
-                resolve(downloadURL);
+                try {
+                    // Get download URL
+                    const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                    console.log("File uploaded successfully:", downloadURL);
+                    
+                    hideUploadProgress();
+                    resolve(downloadURL);
+                    
+                } catch (urlError) {
+                    console.error("Error getting download URL:", urlError);
+                    hideUploadProgress();
+                    reject(new Error("Failed to get file URL"));
+                }
             }
         );
     });

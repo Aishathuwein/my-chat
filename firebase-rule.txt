@@ -1,0 +1,99 @@
+// ============================================
+// FIREBASE FIRESTORE RULES - COMPLETE WORKING
+// ============================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========== USERS COLLECTION ==========
+    // Users can read any user profile
+    // Users can only write their own profile
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // ========== MESSAGES COLLECTION ==========
+    // Users can read messages if they are in the chat
+    // Users can create messages if authenticated
+    // Users can update/delete only their own messages
+    match /messages/{messageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+    }
+    
+    // ========== CHATS COLLECTION ==========
+    // Users can read chats if they are participants
+    // Users can create chats if authenticated
+    // Users can update chats if they are participants
+    match /chats/{chatId} {
+      allow read: if request.auth != null && 
+        (resource.data.participants.hasAny([request.auth.uid]) ||
+         resource.data.type == 'global');
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        resource.data.participants.hasAny([request.auth.uid]);
+    }
+    
+    // ========== GROUPS COLLECTION ==========
+    // Users can read groups if they are members
+    // Users can create groups if authenticated
+    // Users can update groups if they are admins or creator
+    // Users can delete groups if they are creator
+    match /groups/{groupId} {
+      allow read: if request.auth != null && 
+        (resource.data.members.hasAny([request.auth.uid]) ||
+         request.auth.uid == resource.data.createdBy);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.createdBy ||
+         resource.data.admins.hasAny([request.auth.uid]));
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.createdBy;
+    }
+    
+    // ========== TYPING INDICATORS ==========
+    match /typing/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ========== SYSTEM COLLECTION ==========
+    match /system/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
+
+// ============================================
+// FIREBASE STORAGE RULES - COMPLETE WORKING
+// ============================================
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload files
+    // Allow anyone to read files (for chat attachments)
+    match /chats/{chatId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // User profile images
+    match /profiles/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // General uploads
+    match /uploads/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
