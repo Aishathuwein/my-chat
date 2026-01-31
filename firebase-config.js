@@ -16,27 +16,25 @@ const firebaseConfig = {
 
 };
 
-
 console.log("🎓 Initializing Zanzibar University Chat...");
 
 // Initialize Firebase
 try {
     if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-        console.log("✅ Firebase initialized successfully");
-    } else {
-        firebase.app(); // if already initialized, use that one
+        const app = firebase.initializeApp(firebaseConfig);
+        console.log("✅ Firebase initialized successfully:", app.name);
     }
 } catch (error) {
     console.error("❌ Firebase initialization error:", error);
-    showNotification("Firebase connection failed", "error");
+    if (typeof showNotification === 'function') {
+        showNotification("Firebase connection failed", "error");
+    }
 }
 
 // Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
-const messaging = firebase.messaging?.isSupported() ? firebase.messaging() : null;
 
 // Enable offline persistence
 db.enablePersistence()
@@ -44,48 +42,24 @@ db.enablePersistence()
         console.log("📦 Offline persistence enabled");
     })
     .catch((err) => {
-        console.log("📦 Persistence error:", err);
+        console.log("📦 Persistence error:", err.code);
+        if (err.code === 'failed-precondition') {
+            console.log("Multiple tabs open");
+        } else if (err.code === 'unimplemented') {
+            console.log("Browser doesn't support persistence");
+        }
     });
 
-// Set Firestore settings
+// Set Firestore settings for better performance
 db.settings({
+    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
     ignoreUndefinedProperties: true
 });
-
-// Global notification function
-function showNotification(title, type = "info", message = "") {
-    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
-    if (typeof window.showAppNotification === 'function') {
-        window.showAppNotification(title, type, message);
-    } else {
-        // Create basic notification
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px;
-            background: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#2ecc71' : '#3498db'};
-            color: white;
-            border-radius: 5px;
-            z-index: 9999;
-            animation: fadeIn 0.3s;
-        `;
-        notification.innerHTML = `<strong>${title}</strong><br>${message}`;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.animation = 'fadeOut 0.3s';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-}
 
 // Export for use in other files
 window.auth = auth;
 window.db = db;
 window.storage = storage;
 window.firebase = firebase;
-window.showFirebaseNotification = showNotification;
 
 console.log("✅ Firebase services ready");

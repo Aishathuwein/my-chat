@@ -1,59 +1,60 @@
 // ============================================
-// ZANZIBAR UNIVERSITY CHAT - COMPLETE WORKING VERSION
+// ZANZIBAR UNIVERSITY CHAT - WORKING VERSION
 // ============================================
 
-console.log("🎓 Zanzibar University Chat starting...");
+console.log("🚀 ZU Chat starting...");
 
-// Global Application State
-const AppState = {
+// Global State
+const state = {
     currentUser: null,
     currentChat: null,
     onlineUsers: new Map(),
     contacts: new Map(),
     groups: new Map(),
-    chats: new Map(),
-    messageListeners: new Map(),
-    typingListeners: new Map(),
     selectedUsers: new Set(),
+    messageListener: null,
     mediaRecorder: null,
     recordingTimer: null,
-    recordingStartTime: null,
     selectedFile: null,
-    uploadTask: null
+    uploadTask: null,
+    emojiList: {
+        smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚'],
+        people: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎'],
+        nature: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒'],
+        objects: ['📚', '✏️', '📝', '📖', '🎓', '🏫', '📎', '📌', '✂️', '📍', '📁', '📂', '📅', '📆', '📊', '📈', '📉', '📋', '📇', '📓'],
+        symbols: ['❤️', '✅', '⭐', '🌟', '✨', '🎉', '🎊', '🎁', '🏆', '🥇', '🥈', '🥉', '📢', '🔔', '📣', '🔍', '🔎', '📌', '📍', '🛡️']
+    }
 };
 
-// DOM Elements Cache
-const UI = {
+// DOM Elements
+const elements = {
     // Screens
     loadingScreen: document.getElementById('loading-screen'),
     authScreen: document.getElementById('auth-screen'),
     chatScreen: document.getElementById('chat-screen'),
     
-    // Auth Elements
+    // Auth
     emailInput: document.getElementById('email'),
     passwordInput: document.getElementById('password'),
     loginBtn: document.getElementById('login-btn'),
     signupBtn: document.getElementById('signup-btn'),
     googleBtn: document.getElementById('google-btn'),
-    showPasswordBtn: document.querySelector('.show-password'),
     
-    // Sidebar Elements
+    // Sidebar
     sidebar: document.getElementById('sidebar'),
     userAvatar: document.getElementById('user-avatar'),
     userName: document.getElementById('user-name'),
     userEmail: document.getElementById('user-email'),
     profileMenuBtn: document.getElementById('profile-menu-btn'),
     profileMenu: document.getElementById('profile-menu'),
-    searchInput: document.getElementById('search-input'),
     navBtns: document.querySelectorAll('.nav-btn'),
     newChatBtn: document.getElementById('new-chat-btn'),
     newGroupBtn: document.getElementById('new-group-btn'),
     chatsList: document.getElementById('chats-list'),
     groupsList: document.getElementById('groups-list'),
     contactsList: document.getElementById('contacts-list'),
-    contactsFilter: document.getElementById('contacts-filter'),
     
-    // Main Chat Elements
+    // Main Chat
     backBtn: document.getElementById('back-btn'),
     chatTitle: document.getElementById('chat-title'),
     chatSubtitle: document.getElementById('chat-subtitle'),
@@ -77,13 +78,16 @@ const UI = {
     newGroupModal: document.getElementById('new-group-modal'),
     filePreviewModal: document.getElementById('file-preview-modal'),
     
-    // Upload Progress
+    // Upload
     uploadProgress: document.getElementById('upload-progress'),
     uploadPercentage: document.getElementById('upload-percentage'),
     progressFill: document.getElementById('progress-fill'),
     uploadFileName: document.getElementById('upload-file-name'),
     uploadFileSize: document.getElementById('upload-file-size'),
-    cancelUpload: document.getElementById('cancel-upload')
+    cancelUpload: document.getElementById('cancel-upload'),
+    
+    // Notifications
+    notificationsContainer: document.getElementById('notifications-container')
 };
 
 // ============================================
@@ -91,87 +95,43 @@ const UI = {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("📚 DOM ready, initializing ZU Chat...");
+    console.log("📚 DOM ready");
     
-    // Setup all event listeners
+    // Setup event listeners
     setupEventListeners();
     
-    // Check auth state
-    checkAuthState();
+    // Setup auth listener
+    auth.onAuthStateChanged(handleAuthStateChange);
     
-    // Hide loading screen
+    // Load emojis
+    loadEmojis('smileys');
+    
+    // Hide loading screen after 1.5 seconds
     setTimeout(() => {
-        UI.loadingScreen.style.display = 'none';
-    }, 1000);
-    
-    console.log("✅ Zanzibar University Chat initialized");
+        elements.loadingScreen.style.display = 'none';
+    }, 1500);
 });
-
-function checkAuthState() {
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            await handleUserLogin(user);
-        } else {
-            handleUserLogout();
-        }
-    });
-}
-
-// ============================================
-// EVENT LISTENERS SETUP
-// ============================================
 
 function setupEventListeners() {
     console.log("🔗 Setting up event listeners...");
     
-    // Auth events
-    UI.loginBtn.addEventListener('click', handleLogin);
-    UI.signupBtn.addEventListener('click', handleSignup);
-    UI.googleBtn.addEventListener('click', handleGoogleLogin);
-    
-    // Enter key for login
-    UI.emailInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
-    });
-    UI.passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
-    });
-    
-    // Show password toggle
-    if (UI.showPasswordBtn) {
-        UI.showPasswordBtn.addEventListener('click', () => {
-            const type = UI.passwordInput.type === 'password' ? 'text' : 'password';
-            UI.passwordInput.type = type;
-            UI.showPasswordBtn.innerHTML = type === 'password' ? 
-                '<i class="fas fa-eye"></i>' : 
-                '<i class="fas fa-eye-slash"></i>';
-        });
-    }
-    
-    // Navigation
-    UI.navBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const view = btn.dataset.view;
-            switchSidebarView(view);
-        });
-    });
-    
-    // New chat/group
-    UI.newChatBtn.addEventListener('click', openNewChatModal);
-    UI.newGroupBtn.addEventListener('click', openNewGroupModal);
+    // Auth
+    elements.loginBtn.addEventListener('click', handleLogin);
+    elements.signupBtn.addEventListener('click', handleSignup);
+    elements.googleBtn.addEventListener('click', handleGoogleLogin);
     
     // Message input
-    UI.messageInput.addEventListener('input', handleMessageInput);
-    UI.messageInput.addEventListener('keypress', (e) => {
+    elements.messageInput.addEventListener('input', handleMessageInput);
+    elements.messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
     });
-    UI.sendBtn.addEventListener('click', sendMessage);
+    elements.sendBtn.addEventListener('click', sendMessage);
     
-    // Attachment handling
-    UI.attachToggle.addEventListener('click', toggleAttachmentMenu);
+    // Attachments
+    elements.attachToggle.addEventListener('click', toggleAttachmentMenu);
     document.querySelectorAll('.attach-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const type = this.dataset.type;
@@ -179,95 +139,106 @@ function setupEventListeners() {
         });
     });
     
-    // Voice recording
-    if (UI.voiceToggle) {
-        UI.voiceToggle.addEventListener('click', toggleVoiceRecording);
-    }
-    if (UI.cancelRecording) {
-        UI.cancelRecording.addEventListener('click', cancelRecording);
-    }
-    if (UI.sendRecording) {
-        UI.sendRecording.addEventListener('click', stopRecording);
-    }
+    // Audio recording
+    elements.voiceToggle.addEventListener('click', toggleVoiceRecording);
+    elements.cancelRecording.addEventListener('click', cancelRecording);
+    elements.sendRecording.addEventListener('click', stopRecording);
     
-    // Emoji picker
-    if (UI.emojiToggle) {
-        UI.emojiToggle.addEventListener('click', toggleEmojiPicker);
-    }
-    
-    // Close modals when clicking outside
-    document.addEventListener('click', (e) => {
-        // Close attachment menu
-        if (UI.attachmentMenu && !UI.attachmentMenu.contains(e.target) && !UI.attachToggle.contains(e.target)) {
-            UI.attachmentMenu.classList.remove('active');
-        }
-        
-        // Close emoji picker
-        if (UI.emojiPicker && !UI.emojiPicker.contains(e.target) && !UI.emojiToggle.contains(e.target)) {
-            UI.emojiPicker.classList.remove('active');
-        }
+    // Emojis
+    elements.emojiToggle.addEventListener('click', toggleEmojiPicker);
+    document.querySelectorAll('.emoji-cat').forEach(cat => {
+        cat.addEventListener('click', function() {
+            const category = this.dataset.category;
+            loadEmojis(category);
+            document.querySelectorAll('.emoji-cat').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+        });
     });
     
-    // Modal close buttons
+    // New chat/group
+    elements.newChatBtn.addEventListener('click', openNewChatModal);
+    elements.newGroupBtn.addEventListener('click', openNewGroupModal);
+    
+    // Navigation
+    elements.navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = btn.dataset.view;
+            switchSidebarView(view);
+        });
+    });
+    
+    // Profile menu
+    elements.profileMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.profileMenu.classList.toggle('active');
+    });
+    
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const action = this.dataset.action;
+            handleProfileAction(action);
+        });
+    });
+    
+    // Close modals
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('.modal').classList.remove('active');
         });
     });
     
-    // Create group button
-    const createGroupBtn = document.getElementById('create-group-btn');
-    if (createGroupBtn) {
-        createGroupBtn.addEventListener('click', createGroup);
-    }
-    
-    // Search functionality
-    if (UI.searchInput) {
-        UI.searchInput.addEventListener('input', handleSearch);
-    }
+    // Create group
+    document.getElementById('create-group-btn').addEventListener('click', createGroup);
     
     // Cancel upload
-    if (UI.cancelUpload) {
-        UI.cancelUpload.addEventListener('click', cancelUpload);
-    }
+    elements.cancelUpload.addEventListener('click', cancelUpload);
     
-    // Mobile menu toggle
-    if (UI.backBtn) {
-        UI.backBtn.addEventListener('click', () => {
-            UI.sidebar.classList.add('active');
-        });
-    }
-    
-    // Profile menu
-    if (UI.profileMenuBtn) {
-        UI.profileMenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            UI.profileMenu.classList.toggle('active');
-        });
-    }
-    
-    // Profile menu actions
-    document.querySelectorAll('.menu-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const action = this.dataset.action;
-            handleProfileMenuAction(action);
-        });
+    // Mobile menu
+    document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
+        elements.sidebar.classList.toggle('active');
     });
     
-    // Load emojis
-    loadEmojis('smileys');
+    // Back button
+    elements.backBtn.addEventListener('click', () => {
+        elements.sidebar.classList.add('active');
+    });
     
-    console.log("✅ All event listeners setup complete");
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!elements.attachmentMenu.contains(e.target) && !elements.attachToggle.contains(e.target)) {
+            elements.attachmentMenu.classList.remove('active');
+        }
+        if (!elements.emojiPicker.contains(e.target) && !elements.emojiToggle.contains(e.target)) {
+            elements.emojiPicker.classList.remove('active');
+        }
+        if (!elements.profileMenu.contains(e.target) && !elements.profileMenuBtn.contains(e.target)) {
+            elements.profileMenu.classList.remove('active');
+        }
+    });
+    
+    console.log("✅ Event listeners setup complete");
 }
 
 // ============================================
-// AUTHENTICATION FUNCTIONS - FIXED
+// AUTHENTICATION
 // ============================================
 
+async function handleAuthStateChange(user) {
+    console.log("🔐 Auth state changed:", user ? user.email : "No user");
+    
+    if (user) {
+        // User signed in
+        await handleUserLogin(user);
+    } else {
+        // User signed out
+        handleUserLogout();
+    }
+}
+
 async function handleLogin() {
-    const email = UI.emailInput.value.trim();
-    const password = UI.passwordInput.value;
+    const email = elements.emailInput.value.trim();
+    const password = elements.passwordInput.value;
     
     if (!email || !password) {
         showNotification('Please enter email and password', 'error');
@@ -277,6 +248,7 @@ async function handleLogin() {
     try {
         showNotification('Logging in...', 'info');
         await auth.signInWithEmailAndPassword(email, password);
+        showNotification('Login successful!', 'success');
     } catch (error) {
         console.error("Login error:", error);
         showNotification(error.message, 'error');
@@ -284,8 +256,8 @@ async function handleLogin() {
 }
 
 async function handleSignup() {
-    const email = UI.emailInput.value.trim();
-    const password = UI.passwordInput.value;
+    const email = elements.emailInput.value.trim();
+    const password = elements.passwordInput.value;
     
     if (!email || !password) {
         showNotification('Please enter email and password', 'error');
@@ -301,13 +273,16 @@ async function handleSignup() {
         showNotification('Creating account...', 'info');
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         
-        // Extract name from email
+        // Get name from email
         const name = email.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         
         // Update profile
         await userCredential.user.updateProfile({
             displayName: name
         });
+        
+        // Create user document
+        await createUserDocument(userCredential.user);
         
         showNotification('Account created successfully!', 'success');
         
@@ -323,51 +298,55 @@ async function handleGoogleLogin() {
         provider.addScope('profile');
         provider.addScope('email');
         
-        // Set custom parameters
-        provider.setCustomParameters({
-            prompt: 'select_account'
-        });
-        
         showNotification('Signing in with Google...', 'info');
         const result = await auth.signInWithPopup(provider);
         
-        // Update user profile in Firestore
-        const user = result.user;
-        await updateUserProfile(user);
+        // Create/update user document
+        await createUserDocument(result.user);
         
-        showNotification('Signed in with Google!', 'success');
+        showNotification('Google login successful!', 'success');
         
     } catch (error) {
         console.error("Google login error:", error);
+        showNotification(error.message, 'error');
         
-        // Handle specific Google auth errors
+        // Try redirect method if popup fails
         if (error.code === 'auth/popup-blocked') {
-            showNotification('Popup blocked by browser. Please allow popups for this site.', 'error');
-        } else if (error.code === 'auth/popup-closed-by-user') {
-            showNotification('Sign in cancelled', 'info');
-        } else {
-            showNotification(error.message, 'error');
+            try {
+                await auth.signInWithRedirect(provider);
+            } catch (redirectError) {
+                console.error("Redirect error:", redirectError);
+            }
         }
     }
 }
 
-// ============================================
-// USER MANAGEMENT
-// ============================================
+async function createUserDocument(user) {
+    const userData = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email.split('@')[0],
+        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=0a3d62&color=fff`,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'online'
+    };
+    
+    await db.collection('users').doc(user.uid).set(userData, { merge: true });
+    return userData;
+}
 
 async function handleUserLogin(user) {
-    console.log("👤 User logged in:", user.email);
-    
-    AppState.currentUser = user;
-    
-    // Update user profile in Firestore
-    await updateUserProfile(user);
+    state.currentUser = user;
     
     // Update UI
     updateUserUI(user);
     
     // Show chat screen
     showScreen('chat-screen');
+    
+    // Update user status
+    await updateUserStatus('online');
     
     // Load initial data
     await loadInitialData();
@@ -376,49 +355,32 @@ async function handleUserLogin(user) {
 }
 
 function handleUserLogout() {
-    console.log("👤 User logged out");
-    
-    // Clear all data
-    AppState.currentUser = null;
-    AppState.currentChat = null;
-    AppState.onlineUsers.clear();
-    AppState.contacts.clear();
-    AppState.groups.clear();
-    AppState.chats.clear();
-    
-    // Clear listeners
-    AppState.messageListeners.forEach(unsub => unsub());
-    AppState.messageListeners.clear();
-    AppState.typingListeners.forEach(unsub => unsub());
-    AppState.typingListeners.clear();
+    state.currentUser = null;
+    state.currentChat = null;
     
     // Clear UI
-    UI.messages.innerHTML = '';
-    UI.chatsList.innerHTML = '';
-    UI.groupsList.innerHTML = '';
-    UI.contactsList.innerHTML = '';
+    elements.messages.innerHTML = '';
+    elements.chatsList.innerHTML = '';
+    elements.groupsList.innerHTML = '';
+    elements.contactsList.innerHTML = '';
+    
+    // Stop listeners
+    if (state.messageListener) {
+        state.messageListener();
+        state.messageListener = null;
+    }
     
     // Show auth screen
     showScreen('auth-screen');
 }
 
-async function updateUserProfile(user) {
-    const userData = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0],
-        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=0a3d62&color=fff`,
-        status: 'online',
-        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        role: user.email.includes('staff') || user.email.includes('admin') ? 'staff' : 'student'
-    };
+async function updateUserStatus(status) {
+    if (!state.currentUser) return;
     
-    try {
-        await db.collection('users').doc(user.uid).set(userData, { merge: true });
-    } catch (error) {
-        console.error("Error updating user profile:", error);
-    }
+    await db.collection('users').doc(state.currentUser.uid).update({
+        status: status,
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    });
 }
 
 // ============================================
@@ -426,7 +388,8 @@ async function updateUserProfile(user) {
 // ============================================
 
 function showScreen(screenName) {
-    // Show selected screen
+    elements.loadingScreen.style.display = 'none';
+    
     document.querySelectorAll('.screen').forEach(screen => {
         screen.style.display = 'none';
     });
@@ -435,42 +398,30 @@ function showScreen(screenName) {
     if (screenElement) {
         screenElement.style.display = 'flex';
     }
-    
-    // Mobile adjustments
-    if (screenName === 'chat-screen' && window.innerWidth <= 768) {
-        UI.sidebar.classList.remove('active');
-    }
 }
 
 function updateUserUI(user) {
-    if (UI.userName) {
-        UI.userName.textContent = user.displayName || user.email.split('@')[0];
-    }
-    if (UI.userEmail) {
-        UI.userEmail.textContent = user.email;
-    }
+    elements.userName.textContent = user.displayName || user.email.split('@')[0];
+    elements.userEmail.textContent = user.email;
     
     // Set avatar
-    if (UI.userAvatar) {
-        if (user.photoURL) {
-            UI.userAvatar.style.backgroundImage = `url(${user.photoURL})`;
-            UI.userAvatar.style.backgroundSize = 'cover';
-            UI.userAvatar.innerHTML = '';
-        } else {
-            const initial = (user.displayName || user.email).charAt(0).toUpperCase();
-            UI.userAvatar.innerHTML = initial;
-            UI.userAvatar.style.background = 'linear-gradient(135deg, var(--zu-blue) 0%, var(--zu-light-blue) 100%)';
-        }
+    const avatar = elements.userAvatar;
+    if (user.photoURL) {
+        avatar.style.backgroundImage = `url(${user.photoURL})`;
+        avatar.style.backgroundSize = 'cover';
+        avatar.innerHTML = '';
+    } else {
+        const initial = (user.displayName || user.email).charAt(0).toUpperCase();
+        avatar.innerHTML = initial;
+        avatar.style.background = 'linear-gradient(135deg, #0a3d62 0%, #3c6382 100%)';
     }
 }
 
 function switchSidebarView(view) {
-    // Update active button
-    UI.navBtns.forEach(btn => {
+    elements.navBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.view === view);
     });
     
-    // Show corresponding content
     document.querySelectorAll('.sidebar-content').forEach(content => {
         content.classList.toggle('active', content.id === `${view}-content`);
     });
@@ -483,100 +434,96 @@ function switchSidebarView(view) {
 async function loadInitialData() {
     console.log("📦 Loading initial data...");
     
-    // Load online users
-    loadOnlineUsers();
+    await Promise.all([
+        loadOnlineUsers(),
+        loadAllUsers(),
+        loadUserGroups(),
+        loadRecentChats()
+    ]);
     
-    // Load all users (contacts)
-    loadAllUsers();
-    
-    // Load user's groups
-    loadUserGroups();
-    
-    // Load recent chats
-    loadRecentChats();
-    
-    // Set up presence tracking
-    setupPresenceTracking();
+    // Setup presence
+    setupPresence();
 }
 
 function loadOnlineUsers() {
-    db.collection('users')
-        .where('status', '==', 'online')
-        .onSnapshot(snapshot => {
-            AppState.onlineUsers.clear();
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                if (user.uid !== AppState.currentUser.uid) {
-                    AppState.onlineUsers.set(user.uid, user);
-                }
+    return new Promise((resolve) => {
+        db.collection('users')
+            .where('status', '==', 'online')
+            .onSnapshot(snapshot => {
+                state.onlineUsers.clear();
+                snapshot.forEach(doc => {
+                    const user = doc.data();
+                    if (user.uid !== state.currentUser.uid) {
+                        state.onlineUsers.set(user.uid, user);
+                    }
+                });
+                updateContactsList();
+                resolve();
             });
-            updateContactsList();
-        }, error => {
-            console.error("Error loading online users:", error);
-        });
-}
-
-function loadAllUsers() {
-    db.collection('users')
-        .orderBy('displayName')
-        .onSnapshot(snapshot => {
-            AppState.contacts.clear();
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                if (user.uid !== AppState.currentUser.uid) {
-                    AppState.contacts.set(user.uid, user);
-                }
-            });
-            updateContactsList();
-        }, error => {
-            console.error("Error loading all users:", error);
-        });
-}
-
-function loadUserGroups() {
-    if (!AppState.currentUser) return;
-    
-    db.collection('groups')
-        .where('members', 'array-contains', AppState.currentUser.uid)
-        .orderBy('createdAt', 'desc')
-        .onSnapshot(snapshot => {
-            AppState.groups.clear();
-            snapshot.forEach(doc => {
-                const group = { id: doc.id, ...doc.data() };
-                AppState.groups.set(group.id, group);
-            });
-            updateGroupsList();
-        }, error => {
-            console.error("Error loading user groups:", error);
-        });
-}
-
-function loadRecentChats() {
-    if (!AppState.currentUser) return;
-    
-    // Load private chats
-    const privateChatsQuery = db.collection('chats')
-        .where('participants', 'array-contains', AppState.currentUser.uid)
-        .where('type', '==', 'private')
-        .orderBy('lastMessageAt', 'desc');
-    
-    privateChatsQuery.onSnapshot(snapshot => {
-        snapshot.forEach(doc => {
-            const chat = { id: doc.id, ...doc.data() };
-            AppState.chats.set(chat.id, chat);
-        });
-        updateChatsList();
-    }, error => {
-        console.error("Error loading private chats:", error);
     });
 }
 
-function setupPresenceTracking() {
-    if (!AppState.currentUser) return;
+function loadAllUsers() {
+    return new Promise((resolve) => {
+        db.collection('users')
+            .orderBy('displayName')
+            .onSnapshot(snapshot => {
+                state.contacts.clear();
+                snapshot.forEach(doc => {
+                    const user = doc.data();
+                    if (user.uid !== state.currentUser.uid) {
+                        state.contacts.set(user.uid, user);
+                    }
+                });
+                updateContactsList();
+                resolve();
+            });
+    });
+}
+
+function loadUserGroups() {
+    if (!state.currentUser) return Promise.resolve();
     
-    const userRef = db.collection('users').doc(AppState.currentUser.uid);
+    return new Promise((resolve) => {
+        db.collection('groups')
+            .where('members', 'array-contains', state.currentUser.uid)
+            .onSnapshot(snapshot => {
+                state.groups.clear();
+                snapshot.forEach(doc => {
+                    const group = { id: doc.id, ...doc.data() };
+                    state.groups.set(group.id, group);
+                });
+                updateGroupsList();
+                resolve();
+            });
+    });
+}
+
+function loadRecentChats() {
+    if (!state.currentUser) return Promise.resolve();
     
-    // Set online status
+    return new Promise((resolve) => {
+        // Load private chats
+        db.collection('chats')
+            .where('participants', 'array-contains', state.currentUser.uid)
+            .where('type', '==', 'private')
+            .onSnapshot(snapshot => {
+                const chats = [];
+                snapshot.forEach(doc => {
+                    chats.push({ id: doc.id, ...doc.data() });
+                });
+                updateChatsList(chats);
+                resolve();
+            });
+    });
+}
+
+function setupPresence() {
+    if (!state.currentUser) return;
+    
+    const userRef = db.collection('users').doc(state.currentUser.uid);
+    
+    // Set online
     userRef.update({
         status: 'online',
         lastSeen: firebase.firestore.FieldValue.serverTimestamp()
@@ -591,29 +538,14 @@ function setupPresenceTracking() {
     };
     
     window.addEventListener('beforeunload', handleDisconnect);
-    
-    // Handle visibility change
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            userRef.update({
-                status: 'away',
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        } else {
-            userRef.update({
-                status: 'online',
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-    });
 }
 
 // ============================================
-// CHAT MANAGEMENT - FIXED
+// CHAT MANAGEMENT
 // ============================================
 
 function openNewChatModal() {
-    UI.newChatModal.classList.add('active');
+    elements.newChatModal.classList.add('active');
     loadUsersForNewChat();
 }
 
@@ -623,22 +555,22 @@ function loadUsersForNewChat() {
     
     usersList.innerHTML = '';
     
-    AppState.contacts.forEach(user => {
+    state.contacts.forEach(user => {
         const userItem = document.createElement('div');
         userItem.className = 'contact-item';
         userItem.innerHTML = `
-            <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
-                ${!user.photoURL ? '<i class="fas fa-user"></i>' : ''}
+            <div class="item-avatar">
+                <i class="fas fa-user"></i>
             </div>
             <div class="item-info">
                 <div class="item-name">${user.displayName}</div>
-                <div class="item-status">${user.role || 'student'} • ${user.status || 'offline'}</div>
+                <div class="item-status">${user.status || 'offline'}</div>
             </div>
         `;
         
         userItem.addEventListener('click', async () => {
             await startPrivateChat(user.uid);
-            UI.newChatModal.classList.remove('active');
+            elements.newChatModal.classList.remove('active');
         });
         
         usersList.appendChild(userItem);
@@ -646,41 +578,42 @@ function loadUsersForNewChat() {
 }
 
 async function startPrivateChat(userId) {
-    if (!AppState.currentUser) return;
+    if (!state.currentUser) return;
     
     try {
-        // Generate chat ID (sorted to ensure consistency)
-        const chatId = [AppState.currentUser.uid, userId].sort().join('_');
+        // Generate chat ID
+        const chatId = [state.currentUser.uid, userId].sort().join('_');
         
-        // Check if chat already exists
-        const chatRef = db.collection('chats').doc(chatId);
-        const chatDoc = await chatRef.get();
+        // Get user info
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            showNotification('User not found', 'error');
+            return;
+        }
         
-        const otherUser = AppState.contacts.get(userId);
+        const user = userDoc.data();
+        
+        // Check if chat exists
+        const chatDoc = await db.collection('chats').doc(chatId).get();
         
         if (!chatDoc.exists) {
             // Create new chat
-            await chatRef.set({
+            await db.collection('chats').doc(chatId).set({
                 id: chatId,
                 type: 'private',
-                participants: [AppState.currentUser.uid, userId],
+                participants: [state.currentUser.uid, userId],
                 participantNames: {
-                    [AppState.currentUser.uid]: AppState.currentUser.displayName,
-                    [userId]: otherUser?.displayName || 'User'
+                    [state.currentUser.uid]: state.currentUser.displayName,
+                    [userId]: user.displayName
                 },
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastMessageAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastMessage: {
-                    text: 'Chat started',
-                    senderId: AppState.currentUser.uid,
-                    senderName: AppState.currentUser.displayName,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                }
+                name: user.displayName
             });
         }
         
         // Switch to chat
-        switchToChat(chatId, 'private', otherUser?.displayName || 'User');
+        switchToChat(chatId, 'private', user.displayName);
         
     } catch (error) {
         console.error("Error starting private chat:", error);
@@ -689,7 +622,7 @@ async function startPrivateChat(userId) {
 }
 
 function openNewGroupModal() {
-    UI.newGroupModal.classList.add('active');
+    elements.newGroupModal.classList.add('active');
     loadUsersForNewGroup();
 }
 
@@ -698,20 +631,16 @@ function loadUsersForNewGroup() {
     if (!membersList) return;
     
     membersList.innerHTML = '';
+    state.selectedUsers.clear();
+    document.getElementById('selected-members').innerHTML = '';
     
-    AppState.selectedUsers.clear();
-    const selectedMembersDiv = document.getElementById('selected-members');
-    if (selectedMembersDiv) {
-        selectedMembersDiv.innerHTML = '';
-    }
-    
-    AppState.contacts.forEach(user => {
+    state.contacts.forEach(user => {
         const userItem = document.createElement('div');
         userItem.className = 'contact-item';
         userItem.innerHTML = `
             <input type="checkbox" class="user-checkbox" id="user-${user.uid}" value="${user.uid}">
-            <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
-                ${!user.photoURL ? '<i class="fas fa-user"></i>' : ''}
+            <div class="item-avatar">
+                <i class="fas fa-user"></i>
             </div>
             <div class="item-info">
                 <div class="item-name">${user.displayName}</div>
@@ -722,10 +651,10 @@ function loadUsersForNewGroup() {
         const checkbox = userItem.querySelector('.user-checkbox');
         checkbox.addEventListener('change', (e) => {
             if (e.target.checked) {
-                AppState.selectedUsers.add(user.uid);
+                state.selectedUsers.add(user.uid);
                 addSelectedMember(user);
             } else {
-                AppState.selectedUsers.delete(user.uid);
+                state.selectedUsers.delete(user.uid);
                 removeSelectedMember(user.uid);
             }
         });
@@ -748,7 +677,7 @@ function addSelectedMember(user) {
     memberTag.querySelector('button').addEventListener('click', (e) => {
         e.stopPropagation();
         const uid = e.target.dataset.uid;
-        AppState.selectedUsers.delete(uid);
+        state.selectedUsers.delete(uid);
         const checkbox = document.getElementById(`user-${uid}`);
         if (checkbox) checkbox.checked = false;
         memberTag.remove();
@@ -779,7 +708,7 @@ async function createGroup() {
         return;
     }
     
-    if (AppState.selectedUsers.size === 0) {
+    if (state.selectedUsers.size === 0) {
         showNotification('Please select at least one member', 'error');
         return;
     }
@@ -788,26 +717,27 @@ async function createGroup() {
         showNotification('Creating group...', 'info');
         
         // Add current user to members
-        const members = Array.from(AppState.selectedUsers);
-        members.push(AppState.currentUser.uid);
+        const members = Array.from(state.selectedUsers);
+        members.push(state.currentUser.uid);
         
-        // Create group
+        // Create group data
         const groupData = {
             name: name,
             description: description,
-            createdBy: AppState.currentUser.uid,
-            creatorName: AppState.currentUser.displayName,
+            createdBy: state.currentUser.uid,
+            creatorName: state.currentUser.displayName,
             members: members,
-            admins: [AppState.currentUser.uid],
+            admins: [state.currentUser.uid],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastActivity: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'group'
         };
         
+        // Create group document
         const groupRef = await db.collection('groups').add(groupData);
         const groupId = groupRef.id;
         
-        // Create chat for the group
+        // Create chat document for the group
         await db.collection('chats').doc(groupId).set({
             id: groupId,
             type: 'group',
@@ -815,20 +745,14 @@ async function createGroup() {
             participants: members,
             groupId: groupId,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastMessageAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastMessage: {
-                text: `Group "${name}" was created`,
-                senderId: 'system',
-                senderName: 'System',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            }
+            lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         // Add welcome message
         await db.collection('messages').add({
             chatId: groupId,
             type: 'system',
-            text: `${AppState.currentUser.displayName} created the group "${name}"`,
+            text: `${state.currentUser.displayName} created the group "${name}"`,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             senderId: 'system',
             senderName: 'System'
@@ -837,345 +761,263 @@ async function createGroup() {
         showNotification(`Group "${name}" created successfully!`, 'success');
         
         // Close modal
-        UI.newGroupModal.classList.remove('active');
+        elements.newGroupModal.classList.remove('active');
         
         // Clear form
         nameInput.value = '';
         descriptionInput.value = '';
-        AppState.selectedUsers.clear();
+        state.selectedUsers.clear();
         document.getElementById('selected-members').innerHTML = '';
         
         // Switch to new group
-        setTimeout(() => {
-            switchToChat(groupId, 'group', name);
-        }, 500);
+        switchToChat(groupId, 'group', name);
         
     } catch (error) {
         console.error("Error creating group:", error);
-        showNotification(`Failed to create group: ${error.message}`, 'error');
+        showNotification('Failed to create group: ' + error.message, 'error');
     }
 }
 
-function switchToChat(chatId, type, name = null) {
+function switchToChat(chatId, type, name = '') {
     // Stop previous listener
-    if (AppState.messageListeners.has(AppState.currentChat?.id)) {
-        AppState.messageListeners.get(AppState.currentChat.id)();
+    if (state.messageListener) {
+        state.messageListener();
+        state.messageListener = null;
     }
     
-    // Stop previous typing listener
-    if (AppState.typingListeners.has(AppState.currentChat?.id)) {
-        AppState.typingListeners.get(AppState.currentChat.id)();
-    }
-    
-    // Update current chat
-    AppState.currentChat = { id: chatId, type: type };
+    // Update state
+    state.currentChat = { id: chatId, type: type };
     
     // Clear messages
-    UI.messages.innerHTML = '';
+    elements.messages.innerHTML = '';
     
     // Update UI
-    updateChatUI(name);
+    if (name) {
+        elements.chatTitle.textContent = name;
+        elements.chatSubtitle.textContent = type === 'private' ? 'Private chat' : 'Group chat';
+    }
     
     // Load messages
     loadChatMessages(chatId);
     
-    // Load typing indicator
-    loadTypingIndicator(chatId);
-    
     // Close sidebar on mobile
     if (window.innerWidth <= 768) {
-        UI.sidebar.classList.remove('active');
-    }
-}
-
-function updateChatUI(name = null) {
-    if (!AppState.currentChat) {
-        UI.chatTitle.textContent = 'Welcome to ZU Chat';
-        UI.chatSubtitle.textContent = 'Select a chat to start messaging';
-        UI.messages.innerHTML = `
-            <div class="welcome-message">
-                <div class="welcome-icon">
-                    <i class="fas fa-comments"></i>
-                </div>
-                <h2>Welcome to Zanzibar University Chat</h2>
-                <p>Select a chat from the sidebar or start a new conversation</p>
-            </div>
-        `;
-        return;
+        elements.sidebar.classList.remove('active');
     }
     
-    if (name) {
-        UI.chatTitle.textContent = name;
-        UI.chatSubtitle.textContent = AppState.currentChat.type === 'group' ? 'Group' : 'Private chat';
-    } else {
-        // Try to get name from state
-        if (AppState.currentChat.type === 'group') {
-            const group = AppState.groups.get(AppState.currentChat.id);
-            UI.chatTitle.textContent = group?.name || 'Group';
-            UI.chatSubtitle.textContent = 'Group';
-        } else {
-            UI.chatTitle.textContent = 'Private Chat';
-            UI.chatSubtitle.textContent = 'Chatting...';
-        }
-    }
+    // Focus message input
+    elements.messageInput.focus();
 }
 
 function loadChatMessages(chatId) {
     if (!chatId) return;
     
-    // Clear existing listener
-    if (AppState.messageListeners.has(chatId)) {
-        AppState.messageListeners.get(chatId)();
-    }
-    
-    // Set up real-time listener for messages
-    const unsubscribe = db.collection('messages')
+    // Set up real-time listener
+    state.messageListener = db.collection('messages')
         .where('chatId', '==', chatId)
         .orderBy('timestamp', 'asc')
         .onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(change => {
-                if (change.type === 'added') {
-                    const message = change.doc.data();
-                    displayMessage(message);
-                }
+            elements.messages.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const message = doc.data();
+                displayMessage(message);
             });
             
             // Scroll to bottom
             setTimeout(() => {
-                UI.messagesContainer.scrollTop = UI.messagesContainer.scrollHeight;
+                elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
             }, 100);
             
         }, error => {
             console.error("Error loading messages:", error);
-            showNotification('Error loading messages', 'error');
-        });
-    
-    // Store unsubscribe function
-    AppState.messageListeners.set(chatId, unsubscribe);
-}
-
-function loadTypingIndicator(chatId) {
-    if (!chatId) return;
-    
-    // Clear existing listener
-    if (AppState.typingListeners.has(chatId)) {
-        AppState.typingListeners.get(chatId)();
-    }
-    
-    // Set up typing indicator listener
-    const unsubscribe = db.collection('typing').doc(chatId)
-        .onSnapshot(doc => {
-            const data = doc.data();
-            if (data) {
-                const typingUsers = Object.keys(data).filter(uid => 
-                    uid !== AppState.currentUser.uid && data[uid] === true
-                );
-                
-                if (typingUsers.length > 0) {
-                    showTypingIndicator(typingUsers);
-                } else {
-                    hideTypingIndicator();
-                }
-            } else {
-                hideTypingIndicator();
+            
+            // Check for index error
+            if (error.code === 'failed-precondition') {
+                showNotification('Database index needed. Please create index for messages collection.', 'error');
             }
         });
-    
-    AppState.typingListeners.set(chatId, unsubscribe);
 }
 
 function displayMessage(message) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message-wrapper ${message.senderId === AppState.currentUser.uid ? 'sent' : 'received'}`;
+    messageDiv.className = `message-wrapper ${message.senderId === state.currentUser.uid ? 'sent' : 'received'}`;
     
-    const isCurrentUser = message.senderId === AppState.currentUser.uid;
+    const isCurrentUser = message.senderId === state.currentUser.uid;
+    const isSystem = message.type === 'system';
     const timestamp = message.timestamp?.toDate ? 
         formatTime(message.timestamp.toDate()) : 
         formatTime(new Date());
     
     let content = '';
     
-    switch (message.type) {
-        case 'text':
-            content = `
-                <div class="message-bubble">
-                    <div class="message-content">
-                        ${!isCurrentUser && message.senderName ? 
-                            `<div class="message-sender">${message.senderName}</div>` : ''}
-                        <div class="message-text">${message.text}</div>
-                        <div class="message-time">${timestamp}</div>
-                    </div>
+    if (isSystem) {
+        content = `
+            <div class="message-bubble" style="max-width: 100%; justify-content: center;">
+                <div class="message-content" style="background: rgba(10, 61, 98, 0.1); color: #0a3d62;">
+                    <div class="message-text" style="text-align: center; font-style: italic;">${message.text}</div>
                 </div>
-            `;
-            break;
-            
-        case 'image':
-            content = `
-                <div class="message-bubble">
-                    <div class="message-content">
-                        ${!isCurrentUser && message.senderName ? 
-                            `<div class="message-sender">${message.senderName}</div>` : ''}
-                        <div class="message-media">
-                            <img src="${message.fileUrl}" alt="Image" onclick="viewImage('${message.fileUrl}')">
+            </div>
+        `;
+    } else if (message.type === 'image') {
+        content = `
+            <div class="message-bubble">
+                <div class="message-content">
+                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+                    <div class="message-media">
+                        <img src="${message.fileUrl}" alt="Image" style="max-width: 300px; border-radius: 8px;">
+                    </div>
+                    ${message.caption ? `<div class="message-text">${message.caption}</div>` : ''}
+                    <div class="message-time">${timestamp}</div>
+                </div>
+            </div>
+        `;
+    } else if (message.type === 'audio') {
+        content = `
+            <div class="message-bubble">
+                <div class="message-content">
+                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+                    <div class="audio-message">
+                        <button class="play-btn">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <div class="audio-controls">
+                            <div class="audio-progress">
+                                <div class="progress-bar" style="width: 0%"></div>
+                            </div>
+                            <div class="audio-duration">${formatDuration(message.duration || 0)}</div>
                         </div>
-                        ${message.caption ? `<div class="message-text">${message.caption}</div>` : ''}
-                        <div class="message-time">${timestamp}</div>
                     </div>
+                    <div class="message-time">${timestamp}</div>
                 </div>
-            `;
-            break;
-            
-        case 'audio':
-            content = `
-                <div class="message-bubble">
-                    <div class="message-content">
-                        ${!isCurrentUser && message.senderName ? 
-                            `<div class="message-sender">${message.senderName}</div>` : ''}
-                        <div class="audio-message" data-audio-url="${message.fileUrl}">
-                            <button class="play-btn">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <div class="audio-controls">
-                                <div class="audio-progress">
-                                    <div class="progress-bar" style="width: 0%"></div>
-                                </div>
-                                <div class="audio-duration">${formatDuration(message.duration || 0)}</div>
-                            </div>
+            </div>
+        `;
+    } else if (message.type === 'file') {
+        content = `
+            <div class="message-bubble">
+                <div class="message-content">
+                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+                    <a href="${message.fileUrl}" class="message-file" target="_blank" download="${message.fileName}">
+                        <div class="file-icon">
+                            <i class="fas fa-file"></i>
                         </div>
-                        <div class="message-time">${timestamp}</div>
-                    </div>
+                        <div class="file-info">
+                            <div class="file-name">${message.fileName}</div>
+                            <div class="file-size">${formatFileSize(message.fileSize)}</div>
+                        </div>
+                        <button class="download-btn">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </a>
+                    <div class="message-time">${timestamp}</div>
                 </div>
-            `;
-            break;
-            
-        case 'file':
-            content = `
-                <div class="message-bubble">
-                    <div class="message-content">
-                        ${!isCurrentUser && message.senderName ? 
-                            `<div class="message-sender">${message.senderName}</div>` : ''}
-                        <a href="${message.fileUrl}" class="message-file" target="_blank" download="${message.fileName}">
-                            <div class="file-icon">
-                                <i class="fas fa-file"></i>
-                            </div>
-                            <div class="file-info">
-                                <div class="file-name">${message.fileName}</div>
-                                <div class="file-size">${formatFileSize(message.fileSize)}</div>
-                            </div>
-                            <button class="download-btn">
-                                <i class="fas fa-download"></i>
-                            </button>
-                        </a>
-                        <div class="message-time">${timestamp}</div>
-                    </div>
+            </div>
+        `;
+    } else {
+        // Text message
+        content = `
+            <div class="message-bubble">
+                <div class="message-content">
+                    ${!isCurrentUser ? `<div class="message-sender">${message.senderName}</div>` : ''}
+                    <div class="message-text">${message.text}</div>
+                    <div class="message-time">${timestamp}</div>
                 </div>
-            `;
-            break;
-            
-        case 'system':
-            content = `
-                <div class="message-bubble" style="max-width: 100%; justify-content: center;">
-                    <div class="message-content" style="background: rgba(10, 61, 98, 0.1); color: var(--zu-blue);">
-                        <div class="message-text" style="text-align: center; font-style: italic;">${message.text}</div>
-                        <div class="message-time">${timestamp}</div>
-                    </div>
-                </div>
-            `;
-            break;
+            </div>
+        `;
     }
     
     messageDiv.innerHTML = content;
-    UI.messages.appendChild(messageDiv);
+    elements.messages.appendChild(messageDiv);
     
-    // Add audio player functionality
+    // Setup audio player if audio message
     if (message.type === 'audio') {
-        setupAudioPlayer(messageDiv.querySelector('.audio-message'));
+        setupAudioPlayer(messageDiv.querySelector('.audio-message'), message.fileUrl);
     }
 }
 
 // ============================================
-// MESSAGING - FIXED
+// MESSAGING
 // ============================================
 
 async function sendMessage() {
-    if (!AppState.currentChat || !AppState.currentUser) {
+    if (!state.currentChat || !state.currentUser) {
         showNotification('Select a chat first', 'error');
         return;
     }
     
-    const text = UI.messageInput.value.trim();
-    if (!text && !AppState.selectedFile) {
+    const text = elements.messageInput.value.trim();
+    if (!text && !state.selectedFile) {
         showNotification('Please enter a message', 'error');
         return;
     }
     
     try {
         let messageData = {
-            chatId: AppState.currentChat.id,
-            senderId: AppState.currentUser.uid,
-            senderName: AppState.currentUser.displayName,
+            chatId: state.currentChat.id,
+            senderId: state.currentUser.uid,
+            senderName: state.currentUser.displayName,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'text',
-            text: text,
-            status: 'sent'
+            text: text
         };
         
-        // Handle file upload if present
-        if (AppState.selectedFile) {
-            const fileUrl = await uploadFile(AppState.selectedFile);
+        // Handle file upload
+        if (state.selectedFile) {
+            const fileUrl = await uploadFile(state.selectedFile);
             messageData = {
                 ...messageData,
-                type: AppState.selectedFile.type,
+                type: state.selectedFile.type,
                 fileUrl: fileUrl,
-                fileName: AppState.selectedFile.name,
-                fileSize: AppState.selectedFile.size,
-                caption: text
+                fileName: state.selectedFile.name,
+                fileSize: state.selectedFile.size,
+                caption: text || ''
             };
             
-            if (AppState.selectedFile.type === 'audio') {
-                messageData.duration = AppState.selectedFile.duration || 0;
+            if (state.selectedFile.type === 'audio') {
+                messageData.duration = state.selectedFile.duration || 0;
             }
             
-            AppState.selectedFile = null;
+            state.selectedFile = null;
         }
         
-        // Save message to Firestore
+        // Save to Firestore
         await db.collection('messages').add(messageData);
         
         // Update chat's last message
         await updateChatLastMessage(messageData);
         
         // Clear input
-        UI.messageInput.value = '';
-        UI.messageInput.focus();
-        UI.sendBtn.classList.remove('active');
+        elements.messageInput.value = '';
+        elements.messageInput.focus();
+        elements.sendBtn.classList.remove('active');
         
-        // Clear typing indicator
-        await db.collection('typing').doc(AppState.currentChat.id).update({
-            [AppState.currentUser.uid]: firebase.firestore.FieldValue.delete()
-        });
+        showNotification('Message sent', 'success');
         
     } catch (error) {
         console.error("Error sending message:", error);
-        showNotification(`Failed to send message: ${error.message}`, 'error');
+        showNotification('Failed to send message: ' + error.message, 'error');
     }
 }
 
-async function uploadFile(file) {
+async function uploadFile(fileData) {
     return new Promise((resolve, reject) => {
-        // Show upload progress
-        showUploadProgress(file.name, file.size);
+        if (!fileData || !fileData.file) {
+            reject(new Error('No file provided'));
+            return;
+        }
         
-        // Generate unique file name
+        const file = fileData.file;
         const fileId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const fileExt = file.name.split('.').pop();
         const fileName = `${fileId}.${fileExt}`;
-        const filePath = `uploads/${AppState.currentUser.uid}/${AppState.currentChat.id}/${fileName}`;
+        const filePath = `uploads/${state.currentUser.uid}/${state.currentChat.id}/${fileName}`;
         
-        // Upload to Firebase Storage
+        // Show upload progress
+        showUploadProgress(file.name, file.size);
+        
+        // Upload to storage
         const uploadTask = storage.ref(filePath).put(file);
-        
-        AppState.uploadTask = uploadTask;
+        state.uploadTask = uploadTask;
         
         uploadTask.on('state_changed',
             (snapshot) => {
@@ -1187,18 +1029,21 @@ async function uploadFile(file) {
                 reject(error);
             },
             async () => {
-                const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                hideUploadProgress();
-                resolve(downloadURL);
+                try {
+                    const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                    hideUploadProgress();
+                    resolve(downloadURL);
+                } catch (error) {
+                    hideUploadProgress();
+                    reject(error);
+                }
             }
         );
     });
 }
 
 async function updateChatLastMessage(message) {
-    if (!AppState.currentChat) return;
-    
-    const chatRef = db.collection('chats').doc(AppState.currentChat.id);
+    if (!state.currentChat) return;
     
     const lastMessage = {
         text: message.type === 'text' ? message.text : 
@@ -1210,41 +1055,44 @@ async function updateChatLastMessage(message) {
         timestamp: message.timestamp
     };
     
-    await chatRef.update({
-        lastMessage: lastMessage,
-        lastMessageAt: message.timestamp,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+        await db.collection('chats').doc(state.currentChat.id).update({
+            lastMessage: lastMessage,
+            lastMessageAt: message.timestamp,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Error updating chat:", error);
+    }
 }
 
 // ============================================
-// ATTACHMENTS & AUDIO - FIXED
+// ATTACHMENTS & AUDIO
 // ============================================
 
 function handleAttachment(type) {
-    UI.attachmentMenu.classList.remove('active');
+    elements.attachmentMenu.classList.remove('active');
     
-    switch (type) {
-        case 'image':
-        case 'document':
-            openFilePicker(type);
-            break;
-        case 'audio':
-            startAudioRecording();
-            break;
-        default:
-            showNotification('Feature coming soon', 'info');
-            break;
+    if (type === 'image' || type === 'document') {
+        openFilePicker(type);
+    } else if (type === 'audio') {
+        startAudioRecording();
+    } else if (type === 'camera') {
+        openCamera();
     }
 }
 
 function openFilePicker(accept) {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = accept === 'image' ? 'image/*' : '*/*';
-    input.multiple = false;
     
-    input.onchange = async (e) => {
+    if (accept === 'image') {
+        input.accept = 'image/*';
+    } else if (accept === 'document') {
+        input.accept = '*/*';
+    }
+    
+    input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
@@ -1253,44 +1101,31 @@ function openFilePicker(accept) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const previewContent = document.getElementById('preview-content');
-                if (!previewContent) {
-                    // If preview modal doesn't exist, send directly
-                    AppState.selectedFile = {
-                        file: file,
-                        type: 'image'
-                    };
-                    sendMessage();
-                    return;
-                }
-                
                 previewContent.innerHTML = `
                     <img src="${e.target.result}" alt="Preview" style="max-width: 100%; border-radius: 8px;">
-                    <div class="preview-caption" style="margin-top: 15px;">
+                    <div style="margin-top: 15px;">
                         <input type="text" id="image-caption" placeholder="Add a caption (optional)" 
-                               style="width: 100%; padding: 10px; border: 1px solid var(--zu-border); border-radius: 4px;">
+                               style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px;">
                     </div>
                 `;
                 
-                UI.filePreviewModal.classList.add('active');
+                elements.filePreviewModal.classList.add('active');
                 
-                // Handle send button
-                const sendBtn = document.getElementById('send-file-btn');
-                if (sendBtn) {
-                    sendBtn.onclick = () => {
-                        const caption = document.getElementById('image-caption')?.value || '';
-                        AppState.selectedFile = {
-                            file: file,
-                            type: 'image',
-                            caption: caption
-                        };
-                        UI.filePreviewModal.classList.remove('active');
-                        sendMessage();
+                // Handle send
+                document.getElementById('send-file-btn').onclick = () => {
+                    const caption = document.getElementById('image-caption').value;
+                    state.selectedFile = {
+                        file: file,
+                        type: 'image',
+                        caption: caption
                     };
-                }
+                    elements.filePreviewModal.classList.remove('active');
+                    sendMessage();
+                };
             };
             reader.readAsDataURL(file);
         } else {
-            AppState.selectedFile = {
+            state.selectedFile = {
                 file: file,
                 type: 'file'
             };
@@ -1309,18 +1144,18 @@ function startAudioRecording() {
     
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-            AppState.mediaRecorder = new MediaRecorder(stream);
+            state.mediaRecorder = new MediaRecorder(stream);
             const audioChunks = [];
             
-            AppState.mediaRecorder.ondataavailable = event => {
+            state.mediaRecorder.ondataavailable = event => {
                 audioChunks.push(event.data);
             };
             
-            AppState.mediaRecorder.onstop = async () => {
+            state.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const duration = (Date.now() - AppState.recordingStartTime) / 1000;
+                const duration = (Date.now() - state.recordingStartTime) / 1000;
                 
-                AppState.selectedFile = {
+                state.selectedFile = {
                     file: new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' }),
                     type: 'audio',
                     duration: duration
@@ -1328,54 +1163,54 @@ function startAudioRecording() {
                 
                 await sendMessage();
                 
-                // Stop all tracks
+                // Stop tracks
                 stream.getTracks().forEach(track => track.stop());
             };
             
             // Start recording
-            AppState.mediaRecorder.start();
-            AppState.recordingStartTime = Date.now();
+            state.mediaRecorder.start();
+            state.recordingStartTime = Date.now();
             startRecordingTimer();
             
-            // Show recorder UI
-            UI.audioRecorder.classList.add('active');
+            // Show UI
+            elements.audioRecorder.classList.add('active');
             
         })
         .catch(error => {
-            console.error("Error accessing microphone:", error);
+            console.error("Microphone error:", error);
             showNotification('Microphone access denied', 'error');
         });
 }
 
 function stopRecording() {
-    if (AppState.mediaRecorder && AppState.mediaRecorder.state !== 'inactive') {
-        AppState.mediaRecorder.stop();
+    if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
         stopRecordingTimer();
-        UI.audioRecorder.classList.remove('active');
+        elements.audioRecorder.classList.remove('active');
     }
 }
 
 function cancelRecording() {
-    if (AppState.mediaRecorder && AppState.mediaRecorder.state !== 'inactive') {
-        AppState.mediaRecorder.stop();
+    if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
         stopRecordingTimer();
-        UI.audioRecorder.classList.remove('active');
+        elements.audioRecorder.classList.remove('active');
         showNotification('Recording cancelled', 'info');
     }
 }
 
 function startRecordingTimer() {
-    AppState.recordingStartTime = Date.now();
-    AppState.recordingTimer = setInterval(() => {
-        const elapsed = Date.now() - AppState.recordingStartTime;
-        UI.recordingTime.textContent = formatDuration(elapsed / 1000);
+    state.recordingStartTime = Date.now();
+    state.recordingTimer = setInterval(() => {
+        const elapsed = Date.now() - state.recordingStartTime;
+        elements.recordingTime.textContent = formatDuration(elapsed / 1000);
     }, 1000);
 }
 
 function stopRecordingTimer() {
-    if (AppState.recordingTimer) {
-        clearInterval(AppState.recordingTimer);
-        AppState.recordingTimer = null;
+    if (state.recordingTimer) {
+        clearInterval(state.recordingTimer);
+        state.recordingTimer = null;
     }
 }
 
@@ -1383,18 +1218,16 @@ function stopRecordingTimer() {
 // UI UPDATES
 // ============================================
 
-function updateChatsList() {
-    UI.chatsList.innerHTML = '';
+function updateChatsList(chats) {
+    elements.chatsList.innerHTML = '';
     
-    AppState.chats.forEach(chat => {
+    chats.forEach(chat => {
         const chatItem = document.createElement('div');
-        chatItem.className = `chat-item ${AppState.currentChat?.id === chat.id ? 'active' : ''}`;
-        
-        const isGroup = chat.type === 'group';
+        chatItem.className = `chat-item ${state.currentChat?.id === chat.id ? 'active' : ''}`;
         
         chatItem.innerHTML = `
-            <div class="item-avatar ${isGroup ? 'group' : ''}">
-                <i class="fas fa-${isGroup ? 'users' : 'user'}"></i>
+            <div class="item-avatar ${chat.type === 'group' ? 'group' : ''}">
+                <i class="fas fa-${chat.type === 'group' ? 'users' : 'user'}"></i>
             </div>
             <div class="item-info">
                 <div class="item-name">${chat.name || 'Chat'}</div>
@@ -1407,16 +1240,16 @@ function updateChatsList() {
             switchToChat(chat.id, chat.type, chat.name);
         });
         
-        UI.chatsList.appendChild(chatItem);
+        elements.chatsList.appendChild(chatItem);
     });
 }
 
 function updateGroupsList() {
-    UI.groupsList.innerHTML = '';
+    elements.groupsList.innerHTML = '';
     
-    AppState.groups.forEach(group => {
+    state.groups.forEach(group => {
         const groupItem = document.createElement('div');
-        groupItem.className = `group-item ${AppState.currentChat?.id === group.id ? 'active' : ''}`;
+        groupItem.className = `group-item ${state.currentChat?.id === group.id ? 'active' : ''}`;
         
         groupItem.innerHTML = `
             <div class="item-avatar group">
@@ -1432,34 +1265,27 @@ function updateGroupsList() {
             switchToChat(group.id, 'group', group.name);
         });
         
-        UI.groupsList.appendChild(groupItem);
+        elements.groupsList.appendChild(groupItem);
     });
 }
 
 function updateContactsList() {
-    UI.contactsList.innerHTML = '';
+    elements.contactsList.innerHTML = '';
     
-    const filter = UI.contactsFilter?.value || 'all';
-    
-    AppState.contacts.forEach(user => {
-        // Apply filter
-        if (filter === 'online' && user.status !== 'online') return;
-        if (filter === 'students' && user.role !== 'student') return;
-        if (filter === 'staff' && user.role !== 'staff') return;
-        
+    state.contacts.forEach(user => {
         const contactItem = document.createElement('div');
         contactItem.className = 'contact-item';
         
-        const isOnline = user.status === 'online';
+        const isOnline = state.onlineUsers.has(user.uid);
         
         contactItem.innerHTML = `
-            <div class="item-avatar" style="${user.photoURL ? `background-image: url(${user.photoURL})` : ''}">
-                ${!user.photoURL ? '<i class="fas fa-user"></i>' : ''}
+            <div class="item-avatar">
+                <i class="fas fa-user"></i>
                 ${isOnline ? '<div class="status-dot online"></div>' : ''}
             </div>
             <div class="item-info">
                 <div class="item-name">${user.displayName}</div>
-                <div class="item-status">${user.role || 'student'} • ${user.department || 'ZU'}</div>
+                <div class="item-status">${isOnline ? 'Online' : 'Offline'}</div>
             </div>
         `;
         
@@ -1467,166 +1293,57 @@ function updateContactsList() {
             await startPrivateChat(user.uid);
         });
         
-        UI.contactsList.appendChild(contactItem);
+        elements.contactsList.appendChild(contactItem);
     });
-}
-
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-
-function showNotification(title, type = 'info', message = '') {
-    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#e74c3c' : 
-                     type === 'success' ? '#2ecc71' : 
-                     type === 'warning' ? '#f39c12' : '#3498db'};
-        color: white;
-        padding: 15px;
-        border-radius: 5px;
-        z-index: 9999;
-        animation: slideInRight 0.3s ease;
-        max-width: 300px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    `;
-    
-    notification.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 
-                            type === 'error' ? 'exclamation-circle' : 
-                            type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"
-               style="font-size: 20px;"></i>
-            <div>
-                <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
-                ${message ? `<div style="font-size: 14px;">${message}</div>` : ''}
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideInRight 0.3s ease reverse';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 300);
-    }, 5000);
-}
-
-// Export for use in other files
-window.showAppNotification = showNotification;
-
-function formatTime(date) {
-    if (!(date instanceof Date)) date = new Date(date);
-    
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (diff < 604800000) return date.toLocaleDateString([], { weekday: 'short' });
-    
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function handleMessageInput() {
-    const hasText = UI.messageInput.value.trim().length > 0;
-    UI.sendBtn.classList.toggle('active', hasText);
-    
-    // Send typing indicator
-    if (hasText && AppState.currentChat) {
-        sendTypingIndicator(true);
-    }
+    const hasText = elements.messageInput.value.trim().length > 0;
+    elements.sendBtn.classList.toggle('active', hasText);
 }
 
-async function sendTypingIndicator(isTyping) {
-    if (!AppState.currentChat) return;
-    
-    const typingRef = db.collection('typing').doc(AppState.currentChat.id);
-    
-    if (isTyping) {
-        await typingRef.set({
-            [AppState.currentUser.uid]: true,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        
-        // Clear after 3 seconds
-        setTimeout(async () => {
-            await typingRef.update({
-                [AppState.currentUser.uid]: firebase.firestore.FieldValue.delete()
-            });
-        }, 3000);
+function toggleAttachmentMenu() {
+    elements.attachmentMenu.classList.toggle('active');
+}
+
+function toggleVoiceRecording() {
+    if (elements.audioRecorder.classList.contains('active')) {
+        stopRecording();
     } else {
-        await typingRef.update({
-            [AppState.currentUser.uid]: firebase.firestore.FieldValue.delete()
+        startAudioRecording();
+    }
+}
+
+function toggleEmojiPicker() {
+    elements.emojiPicker.classList.toggle('active');
+}
+
+function loadEmojis(category) {
+    elements.emojiGrid.innerHTML = '';
+    
+    const emojis = state.emojiList[category] || [];
+    
+    emojis.forEach(emoji => {
+        const button = document.createElement('button');
+        button.className = 'emoji-item';
+        button.textContent = emoji;
+        button.addEventListener('click', () => {
+            elements.messageInput.value += emoji;
+            elements.messageInput.focus();
+            handleMessageInput();
         });
-    }
-}
-
-function showTypingIndicator(userIds) {
-    const typingDiv = document.getElementById('typing-indicator');
-    if (!typingDiv) return;
-    
-    const userNames = userIds.map(uid => {
-        const user = AppState.contacts.get(uid) || AppState.onlineUsers.get(uid);
-        return user?.displayName || 'Someone';
+        elements.emojiGrid.appendChild(button);
     });
-    
-    const typingText = document.getElementById('typing-text');
-    if (typingText) {
-        if (userNames.length === 1) {
-            typingText.textContent = `${userNames[0]} is typing...`;
-        } else if (userNames.length === 2) {
-            typingText.textContent = `${userNames[0]} and ${userNames[1]} are typing...`;
-        } else {
-            typingText.textContent = `${userNames[0]} and others are typing...`;
-        }
-    }
-    
-    typingDiv.style.display = 'flex';
 }
 
-function hideTypingIndicator() {
-    const typingDiv = document.getElementById('typing-indicator');
-    if (typingDiv) {
-        typingDiv.style.display = 'none';
-    }
-}
-
-function setupAudioPlayer(audioElement) {
-    if (!audioElement) return;
+function setupAudioPlayer(audioElement, audioUrl) {
+    if (!audioElement || !audioUrl) return;
     
     const playBtn = audioElement.querySelector('.play-btn');
     const progressBar = audioElement.querySelector('.progress-bar');
     const durationElement = audioElement.querySelector('.audio-duration');
-    const audioUrl = audioElement.dataset.audioUrl;
     
-    let audio = new Audio(audioUrl);
+    const audio = new Audio(audioUrl);
     let isPlaying = false;
     
     // Update duration
@@ -1648,104 +1365,115 @@ function setupAudioPlayer(audioElement) {
     });
     
     audio.addEventListener('timeupdate', () => {
-        const progress = (audio.currentTime / audio.duration) * 100;
-        progressBar.style.width = `${progress}%`;
+        if (progressBar && audio.duration) {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
     });
     
     audio.addEventListener('ended', () => {
         isPlaying = false;
         playBtn.innerHTML = '<i class="fas fa-play"></i>';
-        progressBar.style.width = '0%';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
     });
 }
 
-function loadEmojis(category) {
-    if (!UI.emojiGrid) return;
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function showNotification(title, type = 'info', message = '') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-icon">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                            type === 'error' ? 'exclamation-circle' : 
+                            type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        </div>
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            ${message ? `<div class="notification-message">${message}</div>` : ''}
+        </div>
+        <button class="notification-close">&times;</button>
+    `;
     
-    UI.emojiGrid.innerHTML = '';
+    elements.notificationsContainer.appendChild(notification);
     
-    const emojis = {
-        smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚'],
-        people: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎'],
-        objects: ['📚', '✏️', '📝', '📖', '🎓', '🏫', '📎', '📌', '✂️', '📍', '📁', '📂', '📅', '📆', '📊', '📈', '📉', '📋', '📇', '📓'],
-        symbols: ['❤️', '✅', '⭐', '🌟', '✨', '🎉', '🎊', '🎁', '🏆', '🥇', '🥈', '🥉', '📢', '🔔', '📣', '🔍', '🔎', '📌', '📍', '🛡️']
-    }[category] || [];
-    
-    emojis.forEach(emoji => {
-        const button = document.createElement('button');
-        button.className = 'emoji-item';
-        button.textContent = emoji;
-        button.addEventListener('click', () => {
-            UI.messageInput.value += emoji;
-            UI.messageInput.focus();
-            handleMessageInput();
-        });
-        UI.emojiGrid.appendChild(button);
+    // Close button
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+        notification.remove();
     });
+    
+    // Auto remove
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+    
+    // Log to console
+    console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
 }
 
-function toggleAttachmentMenu() {
-    UI.attachmentMenu.classList.toggle('active');
+function formatTime(date) {
+    if (!(date instanceof Date)) date = new Date(date);
+    
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function toggleVoiceRecording() {
-    if (UI.audioRecorder.classList.contains('active')) {
-        stopRecording();
-    } else {
-        startAudioRecording();
-    }
+function formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-function toggleEmojiPicker() {
-    UI.emojiPicker.classList.toggle('active');
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function showUploadProgress(fileName, fileSize) {
-    if (UI.uploadFileName) UI.uploadFileName.textContent = fileName;
-    if (UI.uploadFileSize) UI.uploadFileSize.textContent = formatFileSize(fileSize);
-    UI.uploadProgress.classList.add('active');
+    elements.uploadFileName.textContent = fileName;
+    elements.uploadFileSize.textContent = formatFileSize(fileSize);
+    elements.uploadProgress.classList.add('active');
 }
 
 function updateUploadProgress(percentage) {
-    if (UI.progressFill) UI.progressFill.style.width = `${percentage}%`;
-    if (UI.uploadPercentage) UI.uploadPercentage.textContent = `${Math.round(percentage)}%`;
+    elements.progressFill.style.width = `${percentage}%`;
+    elements.uploadPercentage.textContent = `${Math.round(percentage)}%`;
 }
 
 function hideUploadProgress() {
     setTimeout(() => {
-        UI.uploadProgress.classList.remove('active');
-        if (UI.progressFill) UI.progressFill.style.width = '0%';
-        if (UI.uploadPercentage) UI.uploadPercentage.textContent = '0%';
+        elements.uploadProgress.classList.remove('active');
+        elements.progressFill.style.width = '0%';
+        elements.uploadPercentage.textContent = '0%';
     }, 500);
 }
 
 function cancelUpload() {
-    if (AppState.uploadTask) {
-        AppState.uploadTask.cancel();
+    if (state.uploadTask) {
+        state.uploadTask.cancel();
         hideUploadProgress();
         showNotification('Upload cancelled', 'info');
+        state.uploadTask = null;
     }
 }
 
-function handleSearch() {
-    const query = UI.searchInput.value.toLowerCase();
-    
-    // Filter chats
-    document.querySelectorAll('.chat-item').forEach(item => {
-        const name = item.querySelector('.item-name')?.textContent.toLowerCase() || '';
-        const message = item.querySelector('.item-last-message')?.textContent.toLowerCase() || '';
-        item.style.display = name.includes(query) || message.includes(query) ? 'flex' : 'none';
-    });
-    
-    // Filter contacts
-    document.querySelectorAll('.contact-item').forEach(item => {
-        const name = item.querySelector('.item-name')?.textContent.toLowerCase() || '';
-        const status = item.querySelector('.item-status')?.textContent.toLowerCase() || '';
-        item.style.display = name.includes(query) || status.includes(query) ? 'flex' : 'none';
-    });
-}
-
-function handleProfileMenuAction(action) {
+function handleProfileAction(action) {
     switch (action) {
         case 'profile':
             showNotification('Profile', 'info', 'Profile feature coming soon');
@@ -1754,32 +1482,17 @@ function handleProfileMenuAction(action) {
             showNotification('Settings', 'info', 'Settings feature coming soon');
             break;
         case 'notifications':
-            showNotification('Notifications', 'info', 'Notification settings updated');
+            showNotification('Notifications', 'info', 'Notification settings coming soon');
             break;
         case 'logout':
             auth.signOut();
             break;
     }
-    UI.profileMenu.classList.remove('active');
+    elements.profileMenu.classList.remove('active');
 }
 
-// Global functions for UI interactions
-window.viewImage = function(url) {
-    window.open(url, '_blank');
-};
+// Global functions
+window.showNotification = showNotification;
+window.startPrivateChat = startPrivateChat;
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    .notification {
-        animation: slideInRight 0.3s ease;
-    }
-`;
-document.head.appendChild(style);
-
-console.log("🎉 Zanzibar University Chat System Ready!");
+console.log("🎉 ZU Chat System Ready!");
