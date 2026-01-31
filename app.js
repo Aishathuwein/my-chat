@@ -940,132 +940,196 @@ function displayMessage(message) {
 // ============================================
 
 async function sendMessage() {
-    if (!state.currentChat || !state.currentUser) {
+    if (!AppState.currentChat || !AppState.currentUser) {
         showNotification('Select a chat first', 'error');
         return;
     }
     
-    const text = elements.messageInput.value.trim();
-    if (!text && !state.selectedFile) {
+    const text = UI.messageInput.value.trim();
+    if (!text && !AppState.selectedFile) {
         showNotification('Please enter a message', 'error');
         return;
     }
     
     try {
         let messageData = {
-            chatId: state.currentChat.id,
-            senderId: state.currentUser.uid,
-            senderName: state.currentUser.displayName,
+            chatId: AppState.currentChat.id,
+            senderId: AppState.currentUser.uid,
+            senderName: AppState.currentUser.displayName || AppState.currentUser.email.split('@')[0],
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'text',
-            text: text
+            text: text,
+            status: 'sent'
         };
         
-        // Handle file upload
-        if (state.selectedFile) {
-            const fileUrl = await uploadFile(state.selectedFile);
-            messageData = {
-                ...messageData,
-                type: state.selectedFile.type,
-                fileUrl: fileUrl,
-                fileName: state.selectedFile.name,
-                fileSize: state.selectedFile.size,
-                caption: text || ''
-            };
+        // Handle file upload if present
+        if (AppState.selectedFile) {
+            console.log("Uploading file:", AppState.selectedFile);
             
-            if (state.selectedFile.type === 'audio') {
-                messageData.duration = state.selectedFile.duration || 0;
+            // Upload file to Firebase Storage
+            const fileUrl = await uploadFile(AppState.selectedFile);
+            
+            // Build message data based on file type
+            messageData.type = AppState.selectedFile.type;
+            messageData.fileUrl = fileUrl;
+            messageData.fileName = AppState.selectedFile.name || `file_${Date.now()}`;
+            messageData.fileSize = AppState.selectedFile.size || 0;
+            
+            if (AppState.selectedFile.caption) {
+                messageData.caption = AppState.selectedFile.caption;
             }
             
-            state.selectedFile = null;
+            if (text && text.trim() && !AppState.selectedFile.caption) {
+                messageData.caption = text;
+            }
+            
+            if (AppState.selectedFile.type === 'audio' && AppState.selectedFile.duration) {
+                messageData.duration = AppState.selectedFile.duration;
+            }
+            
+            // Clear selected file
+            AppState.selectedFile = null;
         }
         
-        // Save to Firestore
-        await db.collection('messages').add(messageData);
+        console.log("Saving message data:", messageData);
+        
+        // Validate all required fields
+        if (!messageData.chatId) {
+            throw new Error('Chat ID is required');
+        }
+        
+        if (!messageData.senderId) {
+            throw new Error('Sender ID is required');
+        }
+        
+        if (!messageData.type) {
+            throw new Error('Message type is required');
+        }
+        
+        // For text messages, ensure text field exists
+        if (messageData.type === 'text' && !messageData.text) {
+            messageData.text = " "; // Empty text placeholder
+        }
+        
+        // For file messages, ensure fileUrl exists
+        if (['image', 'audio', 'file'].includes(messageData.type) && !messageData.fileUrl) {
+            throw new Error('File URL is required for file messages');
+        }
+        
+        // Save message to Firestore
+        const messageRef = await db.collection('messages').add(messageData);
+        console.log("✅ Message sent with ID:", messageRef.id);
         
         // Update chat's last message
         await updateChatLastMessage(messageData);
         
         // Clear input
-        elements.messageInput.value = '';
-        elements.messageInput.focus();
-        elements.sendBtn.classList.remove('active');
+        UI.messageInput.value = '';
+        UI.messageInput.focus();
+        UI.sendBtn.classList.remove('active');
         
-        showNotification('Message sent', 'success');
+        // Hide attachment menu
+        UI.attachmentMenu.classList.remove('active');
         
     } catch (error) {
-        console.error("Error sending message:", error);
+        console.error("❌ Error sending message:", error);
         showNotification('Failed to send message: ' + error.message, 'error');
     }
 }
 
 async function uploadFile(fileData) {
     return new Promise((resolve, reject) => {
+        console.log("Starting file upload:", fileData);
+        
         if (!fileData || !fileData.file) {
             reject(new Error('No file provided'));
             return;
         }
         
         const file = fileData.file;
-        const fileId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${fileId}.${fileExt}`;
-        const filePath = `uploads/${state.currentUser.uid}/${state.currentChat.id}/${fileName}`;
         
         // Show upload progress
         showUploadProgress(file.name, file.size);
         
-        // Upload to storage
+        // Generate unique file name
+        const fileId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const fileExt = file.name.split('.').pop() || 'file';
+        const fileName = `${fileId}.${fileExt}`;
+        const filePath = `uploads/${AppState.currentUser.uid}/${AppState.currentChat.id}/${fileName}`;
+        
+        console.log("Uploading to path:", filePath);
+        
+        // Upload to Firebase Storage
         const uploadTask = storage.ref(filePath).put(file);
-        state.uploadTask = uploadTask;
+        
+        AppState.uploadTask = uploadTask;
         
         uploadTask.on('state_changed',
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 updateUploadProgress(progress);
+                console.log(`Upload progress: ${progress}%`);
             },
             (error) => {
+                console.error("Upload error:", error);
                 hideUploadProgress();
-                reject(error);
+                reject(new Error('Upload failed: ' + error.message));
             },
             async () => {
                 try {
                     const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                    console.log("Upload successful, URL:", downloadURL);
                     hideUploadProgress();
                     resolve(downloadURL);
                 } catch (error) {
+                    console.error("Error getting download URL:", error);
                     hideUploadProgress();
-                    reject(error);
+                    reject(new Error('Failed to get download URL'));
                 }
             }
         );
     });
 }
-
 async function updateChatLastMessage(message) {
-    if (!state.currentChat) return;
-    
-    const lastMessage = {
-        text: message.type === 'text' ? message.text : 
-              message.type === 'image' ? '📷 Sent an image' :
-              message.type === 'audio' ? '🎤 Sent an audio message' :
-              message.type === 'file' ? '📎 Sent a file' : message.text,
-        senderId: message.senderId,
-        senderName: message.senderName,
-        timestamp: message.timestamp
-    };
+    if (!AppState.currentChat) return;
     
     try {
-        await db.collection('chats').doc(state.currentChat.id).update({
+        const chatRef = db.collection('chats').doc(AppState.currentChat.id);
+        
+        // Prepare last message data
+        let lastMessageText = '';
+        if (message.type === 'text') {
+            lastMessageText = message.text;
+        } else if (message.type === 'image') {
+            lastMessageText = '📷 Image';
+        } else if (message.type === 'audio') {
+            lastMessageText = '🎤 Audio message';
+        } else if (message.type === 'file') {
+            lastMessageText = '📎 File';
+        } else {
+            lastMessageText = 'New message';
+        }
+        
+        const lastMessage = {
+            text: lastMessageText,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            timestamp: message.timestamp || firebase.firestore.FieldValue.serverTimestamp(),
+            type: message.type
+        };
+        
+        await chatRef.update({
             lastMessage: lastMessage,
-            lastMessageAt: message.timestamp,
+            lastMessageAt: message.timestamp || firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        
+        console.log("✅ Chat last message updated");
+        
     } catch (error) {
-        console.error("Error updating chat:", error);
+        console.error("Error updating chat last message:", error);
     }
 }
-
 // ============================================
 // ATTACHMENTS & AUDIO
 // ============================================
@@ -1085,14 +1149,10 @@ function handleAttachment(type) {
 function openFilePicker(accept) {
     const input = document.createElement('input');
     input.type = 'file';
+    input.accept = accept === 'image' ? 'image/*' : '*/*';
+    input.multiple = false;
     
-    if (accept === 'image') {
-        input.accept = 'image/*';
-    } else if (accept === 'document') {
-        input.accept = '*/*';
-    }
-    
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
@@ -1103,37 +1163,94 @@ function openFilePicker(accept) {
                 const previewContent = document.getElementById('preview-content');
                 previewContent.innerHTML = `
                     <img src="${e.target.result}" alt="Preview" style="max-width: 100%; border-radius: 8px;">
-                    <div style="margin-top: 15px;">
+                    <div class="preview-caption" style="margin-top: 15px;">
                         <input type="text" id="image-caption" placeholder="Add a caption (optional)" 
-                               style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px;">
+                               style="width: 100%; padding: 10px; border: 1px solid var(--zu-border); border-radius: 4px;">
                     </div>
                 `;
                 
-                elements.filePreviewModal.classList.add('active');
+                UI.filePreviewModal.classList.add('active');
                 
-                // Handle send
+                // Handle send button
                 document.getElementById('send-file-btn').onclick = () => {
                     const caption = document.getElementById('image-caption').value;
-                    state.selectedFile = {
+                    AppState.selectedFile = {
                         file: file,
                         type: 'image',
+                        name: file.name,
+                        size: file.size,
                         caption: caption
                     };
-                    elements.filePreviewModal.classList.remove('active');
+                    UI.filePreviewModal.classList.remove('active');
                     sendMessage();
                 };
             };
             reader.readAsDataURL(file);
         } else {
-            state.selectedFile = {
+            // For documents
+            AppState.selectedFile = {
                 file: file,
-                type: 'file'
+                type: 'file',
+                name: file.name,
+                size: file.size
             };
             sendMessage();
         }
     };
     
     input.click();
+}
+
+function startAudioRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showNotification('Audio recording not supported', 'error');
+        return;
+    }
+    
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            AppState.mediaRecorder = new MediaRecorder(stream);
+            const audioChunks = [];
+            
+            AppState.mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            
+            AppState.mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const duration = (Date.now() - AppState.recordingStartTime) / 1000;
+                
+                const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, {
+                    type: 'audio/webm'
+                });
+                
+                AppState.selectedFile = {
+                    file: audioFile,
+                    type: 'audio',
+                    name: audioFile.name,
+                    size: audioFile.size,
+                    duration: duration
+                };
+                
+                await sendMessage();
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            // Start recording
+            AppState.mediaRecorder.start();
+            AppState.recordingStartTime = Date.now();
+            startRecordingTimer();
+            
+            // Show recorder UI
+            UI.audioRecorder.classList.add('active');
+            
+        })
+        .catch(error => {
+            console.error("Error accessing microphone:", error);
+            showNotification('Microphone access denied', 'error');
+        });
 }
 
 function startAudioRecording() {
