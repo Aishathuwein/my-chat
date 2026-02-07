@@ -2,565 +2,377 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a3d62">
-    <title>Zanzibar University Chat</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="https://via.placeholder.com/64/0a3d62/ffffff?text=ZU">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zanzibar University Chat System</title>
     
-    <!-- Firebase -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Manifest for PWA -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/logo.png">
 </head>
 <body>
-    <!-- Installation Prompt -->
-    <div id="install-prompt" class="install-prompt">
-        <div class="install-content">
-            <i class="fas fa-download"></i>
-            <div class="install-text">
-                <h3>Install Chat App</h3>
-                <p>Install for better experience with notifications</p>
-            </div>
-            <div class="install-buttons">
-                <button id="install-cancel" class="btn-install-secondary">Later</button>
-                <button id="install-confirm" class="btn-install-primary">Install</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Loading Screen -->
     <div id="loading-screen">
         <div class="loading-content">
-            <div class="zu-logo">
-                <div class="zu-circle">ZU</div>
-            </div>
-            <h1>Zanzibar University Chat</h1>
-            <p>Connecting students & staff</p>
+            <img src="assets/logo.png" alt="Zanzibar University Logo" class="loading-logo">
+            <h2>Zanzibar University Chat</h2>
             <div class="spinner"></div>
+            <p>Loading...</p>
         </div>
     </div>
 
-    <!-- Auth Screen -->
-    <div id="auth-screen" class="screen">
+    <!-- Authentication Screen -->
+    <div id="auth-screen" class="hidden">
         <div class="auth-container">
             <div class="auth-header">
-                <div class="zu-logo-small">
-                    <div class="zu-circle-small">ZU</div>
-                    <h2>Zanzibar University</h2>
-                </div>
-                <p class="auth-subtitle">Secure Chat System</p>
+                <img src="assets/logo.png" alt="Zanzibar University Logo" class="auth-logo">
+                <h1>Zanzibar University Chat System</h1>
+                <p>Connect, Collaborate, Communicate</p>
             </div>
             
-            <div class="auth-form">
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="showTab('login')">Login</button>
+                <button class="auth-tab" onclick="showTab('register')">Register</button>
+                <button class="auth-tab" onclick="showTab('guest')">Guest Access</button>
+            </div>
+            
+            <div id="login-form" class="auth-form">
                 <div class="form-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" id="email" placeholder="University Email" autocomplete="email">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="student@zanzibaruniversity.ac.tz">
                 </div>
                 <div class="form-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-                    <button type="button" class="show-password">
-                        <i class="fas fa-eye"></i>
-                    </button>
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
                 </div>
-                <div class="auth-buttons">
-                    <button id="login-btn" class="btn btn-primary">
-                        <i class="fas fa-sign-in-alt"></i> Login
-                    </button>
-                    <button id="signup-btn" class="btn btn-secondary">
-                        <i class="fas fa-user-plus"></i> Sign Up
-                    </button>
-                </div>
-                <div class="auth-divider">
-                    <span>or</span>
-                </div>
-                <button id="google-btn" class="btn btn-google">
-                    <i class="fab fa-google"></i> Continue with Google
+                <button onclick="login()" class="auth-button">
+                    <i class="fas fa-sign-in-alt"></i> Login
                 </button>
-                <div class="auth-note">
-                    <p><i class="fas fa-info-circle"></i> Use your university email for verification</p>
+                <div class="auth-error" id="login-error"></div>
+            </div>
+            
+            <div id="register-form" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="register-name">Full Name</label>
+                    <input type="text" id="register-name" placeholder="John Doe">
                 </div>
+                <div class="form-group">
+                    <label for="register-email">University Email</label>
+                    <input type="email" id="register-email" placeholder="student@zanzibaruniversity.ac.tz">
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label for="register-role">Role</label>
+                    <select id="register-role">
+                        <option value="student">Student</option>
+                        <option value="lecturer">Lecturer</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <button onclick="register()" class="auth-button">
+                    <i class="fas fa-user-plus"></i> Register
+                </button>
+                <div class="auth-error" id="register-error"></div>
+            </div>
+            
+            <div id="guest-form" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="guest-name">Display Name</label>
+                    <input type="text" id="guest-name" placeholder="Guest User">
+                </div>
+                <p class="guest-note">Note: Guest accounts have limited features</p>
+                <button onclick="loginAsGuest()" class="auth-button guest-button">
+                    <i class="fas fa-user-secret"></i> Enter as Guest
+                </button>
+                <div class="auth-error" id="guest-error"></div>
+            </div>
+            
+            <div class="auth-footer">
+                <p>By using this system, you agree to our <a href="#">Code of Conduct</a></p>
+                <p>Zanzibar University © 2024</p>
             </div>
         </div>
     </div>
 
-    <!-- Chat Screen -->
-    <div id="chat-screen" class="screen">
-        <!-- Sidebar -->
-        <div class="sidebar" id="sidebar">
-            <!-- User Profile -->
-            <div class="user-profile">
-                <div class="profile-main">
-                    <div class="profile-avatar" id="user-avatar">U</div>
-                    <div class="profile-info">
-                        <h3 id="user-name">User</h3>
-                        <p id="user-email">user@zu.ac.tz</p>
-                        <div class="user-status">
-                            <span class="status-dot online"></span>
-                            <span>Online</span>
+    <!-- Main Chat Interface -->
+    <div id="chat-container" class="hidden">
+        <!-- Header -->
+        <header class="chat-header">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <img src="assets/logo.png" alt="Logo" class="header-logo">
+                <h1>ZU Chat</h1>
+            </div>
+            <div class="header-center">
+                <span id="current-chat-name">Select a conversation</span>
+                <span id="online-status" class="online-dot"></span>
+            </div>
+            <div class="header-right">
+                <button class="header-button" onclick="showNotifications()">
+                    <i class="fas fa-bell"></i>
+                    <span id="notification-count" class="notification-badge hidden">0</span>
+                </button>
+                <button class="header-button" onclick="showUserProfile()">
+                    <i class="fas fa-user"></i>
+                </button>
+                <button class="header-button logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="user-profile">
+                        <img src="" alt="Profile" id="user-avatar" class="user-avatar">
+                        <div class="user-info">
+                            <span id="user-name">Loading...</span>
+                            <span id="user-status" class="user-status online">Online</span>
                         </div>
                     </div>
-                    <button class="profile-menu-btn" id="profile-menu-btn">
-                        <i class="fas fa-ellipsis-v"></i>
+                    <button class="new-chat-btn" onclick="showNewChatModal()">
+                        <i class="fas fa-plus"></i>
                     </button>
                 </div>
-                
-                <!-- Profile Menu Dropdown -->
-                <div class="profile-menu" id="profile-menu">
-                    <a href="#" class="menu-item" data-action="profile">
-                        <i class="fas fa-user"></i> My Profile
-                    </a>
-                    <a href="#" class="menu-item" data-action="settings">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
-                    <a href="#" class="menu-item" data-action="notifications">
-                        <i class="fas fa-bell"></i> Notifications
-                    </a>
-                    <a href="#" class="menu-item" data-action="logout">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a>
-                </div>
-                
+
                 <!-- Search -->
-                <div class="search-container">
+                <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="search-input" placeholder="Search chats, groups or users...">
+                    <input type="text" id="search-chats" placeholder="Search conversations...">
+                </div>
+
+                <!-- Tabs -->
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" onclick="switchTab('chats')">
+                        <i class="fas fa-comments"></i> Chats
+                    </button>
+                    <button class="sidebar-tab" onclick="switchTab('groups')">
+                        <i class="fas fa-users"></i> Groups
+                    </button>
+                    <button class="sidebar-tab" onclick="switchTab('contacts')">
+                        <i class="fas fa-address-book"></i> Contacts
+                    </button>
+                </div>
+
+                <!-- Chats List -->
+                <div class="chats-list" id="chats-tab">
+                    <!-- Chats will be loaded here -->
+                </div>
+
+                <!-- Groups List -->
+                <div class="groups-list hidden" id="groups-tab">
+                    <!-- Groups will be loaded here -->
+                </div>
+
+                <!-- Contacts List -->
+                <div class="contacts-list hidden" id="contacts-tab">
+                    <!-- Contacts will be loaded here -->
                 </div>
             </div>
 
-            <!-- Navigation -->
-            <div class="sidebar-nav">
-                <button class="nav-btn active" data-view="chats">
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <!-- Empty State -->
+                <div id="empty-chat" class="empty-chat">
                     <i class="fas fa-comments"></i>
-                    <span>Chats</span>
-                </button>
-                <button class="nav-btn" data-view="groups">
-                    <i class="fas fa-users"></i>
-                    <span>Groups</span>
-                </button>
-                <button class="nav-btn" data-view="contacts">
-                    <i class="fas fa-address-book"></i>
-                    <span>Contacts</span>
-                </button>
-            </div>
-
-            <!-- Chats List -->
-            <div class="sidebar-content active" id="chats-content">
-                <div class="content-header">
-                    <h3>Recent Chats</h3>
-                    <button class="new-chat-btn" id="new-chat-btn">
-                        <i class="fas fa-plus"></i> New Chat
+                    <h2>Welcome to ZU Chat</h2>
+                    <p>Select a conversation or start a new one</p>
+                    <button class="start-chat-btn" onclick="showNewChatModal()">
+                        Start New Chat
                     </button>
                 </div>
-                <div class="chats-list" id="chats-list">
-                    <!-- Chats will load here -->
-                </div>
-            </div>
 
-            <!-- Groups List -->
-            <div class="sidebar-content" id="groups-content">
-                <div class="content-header">
-                    <h3>My Groups</h3>
-                    <button class="new-group-btn" id="new-group-btn">
-                        <i class="fas fa-plus"></i> New Group
-                    </button>
-                </div>
-                <div class="groups-list" id="groups-list">
-                    <!-- Groups will load here -->
-                </div>
-            </div>
-
-            <!-- Contacts List -->
-            <div class="sidebar-content" id="contacts-content">
-                <div class="content-header">
-                    <h3>All Users</h3>
-                    <div class="contacts-filter">
-                        <select id="contacts-filter">
-                            <option value="all">All Users</option>
-                            <option value="online">Online Only</option>
-                            <option value="students">Students</option>
-                            <option value="staff">Staff</option>
-                        </select>
+                <!-- Active Chat -->
+                <div id="active-chat" class="hidden">
+                    <!-- Chat Messages -->
+                    <div class="messages-container" id="messages-container">
+                        <!-- Messages will be loaded here -->
                     </div>
-                </div>
-                <div class="contacts-list" id="contacts-list">
-                    <!-- Contacts will load here -->
-                </div>
-            </div>
-        </div>
 
-        <!-- Main Chat Area -->
-        <div class="main-chat">
-            <!-- Chat Header -->
-            <div class="chat-header">
-                <div class="chat-info">
-                    <button class="back-btn" id="back-btn">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                    <div class="chat-partner">
-                        <div class="partner-avatar" id="partner-avatar">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="partner-details">
-                            <h2 id="chat-title">Welcome to ZU Chat</h2>
-                            <p id="chat-subtitle">Select a chat to start messaging</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="chat-actions">
-                    <button class="action-btn" id="chat-info-btn" title="Chat Info">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                    <button class="action-btn" id="more-actions-btn" title="More Actions">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- More Actions Menu -->
-            <div class="more-actions-menu" id="more-actions-menu">
-                <button class="action-item" data-action="clear-chat">
-                    <i class="fas fa-trash"></i> Clear Chat
-                </button>
-                <button class="action-item" data-action="media">
-                    <i class="fas fa-images"></i> View Media
-                </button>
-                <button class="action-item" data-action="search-chat">
-                    <i class="fas fa-search"></i> Search in Chat
-                </button>
-                <button class="action-item" data-action="export">
-                    <i class="fas fa-download"></i> Export Chat
-                </button>
-            </div>
-
-            <!-- Messages Container -->
-            <div class="messages-container" id="messages-container">
-                <div class="messages" id="messages">
-                    <div class="welcome-message">
-                        <div class="welcome-icon">
-                            <i class="fas fa-comments"></i>
-                        </div>
-                        <h2>Welcome to Zanzibar University Chat</h2>
-                        <p>Select a chat from the sidebar or start a new conversation</p>
-                        <div class="welcome-features">
-                            <div class="feature">
-                                <i class="fas fa-shield-alt"></i>
-                                <span>Secure & Encrypted</span>
-                            </div>
-                            <div class="feature">
-                                <i class="fas fa-file-upload"></i>
-                                <span>File Sharing</span>
-                            </div>
-                            <div class="feature">
-                                <i class="fas fa-microphone"></i>
-                                <span>Voice Messages</span>
-                            </div>
-                            <div class="feature">
-                                <i class="fas fa-user-graduate"></i>
-                                <span>University Network</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- New Message Indicator -->
-                <div class="new-messages-indicator" id="new-messages-indicator">
-                    <span>New messages</span>
-                    <i class="fas fa-chevron-down"></i>
-                </div>
-            </div>
-
-            <!-- Typing Indicator -->
-            <div class="typing-indicator" id="typing-indicator">
-                <div class="typing-dots">
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                </div>
-                <span id="typing-text">Someone is typing...</span>
-            </div>
-
-            <!-- Message Input Area -->
-            <div class="message-input-area">
-                <!-- Attachment Menu -->
-                <div class="attachment-menu" id="attachment-menu">
-                    <button class="attach-btn" data-type="image" title="Send Image">
-                        <i class="fas fa-image"></i>
-                        <span>Photo</span>
-                    </button>
-                    <button class="attach-btn" data-type="camera" title="Take Photo">
-                        <i class="fas fa-camera"></i>
-                        <span>Camera</span>
-                    </button>
-                    <button class="attach-btn" data-type="audio" title="Voice Message">
-                        <i class="fas fa-microphone"></i>
-                        <span>Audio</span>
-                    </button>
-                    <button class="attach-btn" data-type="document" title="Send Document">
-                        <i class="fas fa-file"></i>
-                        <span>Document</span>
-                    </button>
-                    <button class="attach-btn" data-type="location" title="Share Location">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Location</span>
-                    </button>
-                </div>
-
-                <!-- Audio Recorder -->
-                <div class="audio-recorder" id="audio-recorder">
-                    <div class="recorder-header">
-                        <i class="fas fa-microphone"></i>
-                        <span>Recording...</span>
-                        <span class="recording-time" id="recording-time">00:00</span>
-                    </div>
-                    <div class="recorder-visualizer">
-                        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-                        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-                    </div>
-                    <div class="recorder-actions">
-                        <button class="cancel-recording" id="cancel-recording">
-                            <i class="fas fa-times"></i> Cancel
+                    <!-- Message Input -->
+                    <div class="message-input-area">
+                        <button class="attach-btn" onclick="toggleAttachments()">
+                            <i class="fas fa-paperclip"></i>
                         </button>
-                        <button class="send-recording" id="send-recording">
-                            <i class="fas fa-check"></i> Send
+                        <div class="attachments-menu hidden" id="attachments-menu">
+                            <button onclick="attachFile('image')">
+                                <i class="fas fa-image"></i> Photo
+                            </button>
+                            <button onclick="attachFile('document')">
+                                <i class="fas fa-file"></i> Document
+                            </button>
+                            <button onclick="startAudioRecording()">
+                                <i class="fas fa-microphone"></i> Voice
+                            </button>
+                        </div>
+                        
+                        <div class="message-input-wrapper">
+                            <input 
+                                type="text" 
+                                id="message-input" 
+                                placeholder="Type your message..."
+                                onkeypress="handleKeyPress(event)"
+                            >
+                            <button class="emoji-btn" onclick="toggleEmojiPicker()">
+                                <i class="far fa-smile"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="recording-controls hidden" id="recording-controls">
+                            <i class="fas fa-microphone recording-icon"></i>
+                            <span>Recording...</span>
+                            <button class="stop-recording" onclick="stopAudioRecording()">
+                                Stop
+                            </button>
+                        </div>
+                        
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
                 </div>
-
-                <!-- Main Input -->
-                <button class="attach-toggle" id="attach-toggle">
-                    <i class="fas fa-paperclip"></i>
-                </button>
-                
-                <div class="input-wrapper">
-                    <input type="text" 
-                           id="message-input" 
-                           placeholder="Type your message..."
-                           autocomplete="off">
-                    <button class="emoji-toggle" id="emoji-toggle">
-                        <i class="far fa-smile"></i>
-                    </button>
-                </div>
-                
-                <button class="voice-toggle" id="voice-toggle">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                
-                <button class="send-btn" id="send-btn">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-
-            <!-- Emoji Picker -->
-            <div class="emoji-picker" id="emoji-picker">
-                <div class="emoji-categories">
-                    <button class="emoji-cat active" data-category="smileys">😀</button>
-                    <button class="emoji-cat" data-category="people">👋</button>
-                    <button class="emoji-cat" data-category="objects">📚</button>
-                    <button class="emoji-cat" data-category="symbols">❤️</button>
-                </div>
-                <div class="emoji-grid" id="emoji-grid">
-                    <!-- Emojis will load here -->
-                </div>
             </div>
         </div>
-
-        <!-- Chat Info Sidebar -->
-        <div class="chat-info-sidebar" id="chat-info-sidebar">
-            <div class="info-header">
-                <h3>Chat Info</h3>
-                <button class="close-info" id="close-info-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="info-content" id="info-content">
-                <!-- Chat info will load here -->
-            </div>
-        </div>
-
-        <!-- Mobile Menu Toggle -->
-        <button class="mobile-menu-toggle" id="mobile-menu-toggle">
-            <i class="fas fa-bars"></i>
-        </button>
     </div>
 
     <!-- Modals -->
-    <div class="modal" id="new-chat-modal">
+    <div id="new-chat-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Start New Chat</h3>
-                <button class="close-modal">&times;</button>
+                <h2>New Conversation</h2>
+                <button class="close-modal" onclick="closeModal('new-chat-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="modal-body">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="new-chat-search" placeholder="Search users...">
+                <div class="search-users">
+                    <input type="text" id="search-users" placeholder="Search users...">
                 </div>
-                <div class="users-list" id="new-chat-users">
-                    <!-- Users will load here -->
+                <div class="users-list" id="users-list">
+                    <!-- Users will be loaded here -->
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal" id="new-group-modal">
+    <div id="new-group-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Create New Group</h3>
-                <button class="close-modal">&times;</button>
+                <h2>Create New Group</h2>
+                <button class="close-modal" onclick="closeModal('new-group-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="group-name-input">Group Name</label>
-                    <input type="text" id="group-name-input" placeholder="Enter group name" required>
+                    <label>Group Name</label>
+                    <input type="text" id="group-name" placeholder="Enter group name">
                 </div>
                 <div class="form-group">
-                    <label for="group-description-input">Description (Optional)</label>
-                    <textarea id="group-description-input" placeholder="Group description"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Select Members</label>
+                    <label>Add Members</label>
                     <div class="selected-members" id="selected-members">
                         <!-- Selected members will appear here -->
                     </div>
+                    <input type="text" id="search-group-members" placeholder="Search users to add...">
                     <div class="available-members" id="available-members">
-                        <!-- Available members will load here -->
+                        <!-- Available members will appear here -->
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button class="btn btn-secondary close-modal">Cancel</button>
-                    <button id="create-group-btn" class="btn btn-primary">
-                        <i class="fas fa-plus-circle"></i> Create Group
-                    </button>
-                </div>
+                <button class="create-group-btn" onclick="createGroup()">
+                    Create Group
+                </button>
             </div>
         </div>
     </div>
 
-    <div class="modal" id="group-info-modal">
+    <div id="group-settings-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="group-info-title">Group Info</h3>
-                <button class="close-modal">&times;</button>
+                <h2>Group Settings</h2>
+                <button class="close-modal" onclick="closeModal('group-settings-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <div class="group-info-content" id="group-info-content">
-                    <!-- Group info will load here -->
-                </div>
-                <div class="group-members" id="group-members-list">
-                    <!-- Group members will load here -->
-                </div>
-                <div class="group-actions" id="group-actions">
-                    <!-- Group actions will load here -->
-                </div>
+            <div class="modal-body" id="group-settings-content">
+                <!-- Group settings will be loaded here -->
             </div>
         </div>
     </div>
 
-    <!-- File Preview Modal -->
-    <div class="modal" id="file-preview-modal">
-        <div class="modal-content preview-modal">
+    <div id="profile-modal" class="modal hidden">
+        <div class="modal-content">
             <div class="modal-header">
-                <h3>Preview File</h3>
-                <button class="close-modal">&times;</button>
+                <h2>My Profile</h2>
+                <button class="close-modal" onclick="closeModal('profile-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <div id="preview-content">
-                    <!-- File preview will load here -->
-                </div>
-                <div class="preview-actions">
-                    <button id="send-file-btn" class="btn btn-primary">
-                        <i class="fas fa-paper-plane"></i> Send
-                    </button>
-                    <button class="btn btn-secondary close-modal">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                </div>
+            <div class="modal-body" id="profile-content">
+                <!-- Profile will be loaded here -->
             </div>
         </div>
     </div>
 
-    <!-- Message Actions Menu -->
-    <div class="message-actions-menu" id="message-actions-menu">
-        <button class="action-btn" data-action="reply">
-            <i class="fas fa-reply"></i> Reply
-        </button>
-        <button class="action-btn" data-action="edit">
-            <i class="fas fa-edit"></i> Edit
-        </button>
-        <button class="action-btn" data-action="delete">
-            <i class="fas fa-trash"></i> Delete
-        </button>
-        <button class="action-btn" data-action="copy">
-            <i class="fas fa-copy"></i> Copy
-        </button>
-        <button class="action-btn" data-action="forward">
-            <i class="fas fa-share"></i> Forward
-        </button>
+    <div id="message-actions-modal" class="modal hidden">
+        <div class="modal-content message-actions">
+            <button onclick="editMessage()"><i class="fas fa-edit"></i> Edit</button>
+            <button onclick="deleteMessage()"><i class="fas fa-trash"></i> Delete</button>
+            <button onclick="copyMessage()"><i class="fas fa-copy"></i> Copy</button>
+            <button onclick="closeModal('message-actions-modal')">Cancel</button>
+        </div>
     </div>
 
-    <!-- Upload Progress -->
-    <div class="upload-progress" id="upload-progress">
-        <div class="progress-header">
-            <span>Uploading...</span>
-            <span id="upload-percentage">0%</span>
-        </div>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <div class="file-info">
-            <span id="upload-file-name"></span>
-            <span id="upload-file-size"></span>
-        </div>
-        <button class="cancel-upload" id="cancel-upload">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
 
-    <!-- Notifications Container -->
-    <div class="notifications-container" id="notifications-container">
-        <!-- Notifications will appear here -->
-    </div>
+    <!-- Emoji Picker -->
+    <div id="emoji-picker" class="emoji-picker hidden"></div>
 
-    <!-- JavaScript Files -->
+    <!-- Scripts -->
     <script src="firebase-config.js"></script>
-    <script src="app.js"></script>
+    <script src="auth.js"></script>
+    <script src="chat.js"></script>
     
-    <!-- Install Prompt Handler -->
     <script>
-        let deferredPrompt;
-        const installPrompt = document.getElementById('install-prompt');
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installPrompt.style.display = 'block';
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
         });
         
-        document.getElementById('install-confirm').addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    installPrompt.style.display = 'none';
-                }
-                deferredPrompt = null;
-            }
-        });
+        function initializeApp() {
+            // Hide loading screen after 1 second
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.display = 'none';
+                checkAuthState();
+            }, 1000);
+        }
         
-        document.getElementById('install-cancel').addEventListener('click', () => {
-            installPrompt.style.display = 'none';
-        });
-        
-        // Hide install prompt after 10 seconds
-        setTimeout(() => {
-            installPrompt.style.display = 'none';
-        }, 10000);
+        function checkAuthState() {
+            // This will be implemented in auth.js
+        }
     </script>
 </body>
 </html>

@@ -1,32 +1,35 @@
-// Service Worker for Zanzibar University Chat
-const CACHE_NAME = 'zu-chat-v1';
+const CACHE_NAME = 'zanzibar-university-chat-v1';
 const urlsToCache = [
     '/',
     '/index.html',
     '/style.css',
+    '/auth.js',
+    '/chat.js',
     '/firebase-config.js',
-    '/app.js'
+    '/assets/logo.png',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js'
 ];
 
-// Install event
+// Install service worker
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
-            })
+            .then(cache => cache.addAll(urlsToCache))
     );
 });
 
-// Activate event
+// Activate service worker
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -35,44 +38,29 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event
+// Fetch resources
 self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
             .then(response => {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request);
+                // Return cached version or fetch from network
+                return response || fetch(event.request);
             })
     );
 });
 
-// Push notifications
+// Handle push notifications
 self.addEventListener('push', event => {
-    let data = {};
-    if (event.data) {
-        data = event.data.json();
-    }
+    const data = event.data.json();
     
     const options = {
-        body: data.body || 'New message from ZU Chat',
-        icon: 'https://via.placeholder.com/64/0a3d62/ffffff?text=ZU',
-        badge: 'https://via.placeholder.com/64/0a3d62/ffffff?text=ZU',
-        vibrate: [100, 50, 100],
+        body: data.body || 'New message received',
+        icon: '/assets/logo.png',
+        badge: '/assets/logo.png',
+        vibrate: [200, 100, 200],
         data: {
             url: data.url || '/'
-        },
-        actions: [
-            {
-                action: 'open',
-                title: 'Open Chat'
-            },
-            {
-                action: 'close',
-                title: 'Close'
-            }
-        ]
+        }
     };
     
     event.waitUntil(
@@ -80,35 +68,21 @@ self.addEventListener('push', event => {
     );
 });
 
-// Notification click
+// Handle notification click
 self.addEventListener('notificationclick', event => {
     event.notification.close();
     
-    if (event.action === 'open') {
-        event.waitUntil(
-            clients.matchAll({ type: 'window' })
-                .then(windowClients => {
-                    for (let client of windowClients) {
-                        if (client.url === '/' && 'focus' in client) {
-                            return client.focus();
-                        }
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then(clientList => {
+                for (const client of clientList) {
+                    if (client.url === '/' && 'focus' in client) {
+                        return client.focus();
                     }
-                    if (clients.openWindow) {
-                        return clients.openWindow('/');
-                    }
-                })
-        );
-    }
+                }
+                if (clients.openWindow) {
+                    return clients.openWindow('/');
+                }
+            })
+    );
 });
-
-// Background sync for messages
-self.addEventListener('sync', event => {
-    if (event.tag === 'sync-messages') {
-        event.waitUntil(syncMessages());
-    }
-});
-
-async function syncMessages() {
-    // Implement offline message syncing
-    console.log('Syncing offline messages...');
-}
